@@ -18,10 +18,10 @@ npm pack
 `npm pack` builds the SDK. From your application's directory, install the archive:
 
 ```sh
-npm install /path/to/spavik-typescript-sdk/spavik-client-0.1.0.tgz
+npm install /path/to/spavik-typescript-sdk/spavik-0.1.0.tgz
 ```
 
-Import `Spavik` from `@spavik/client` in JavaScript or TypeScript.
+Import `Spavik` from `spavik` in JavaScript or TypeScript.
 
 ## Local checks
 

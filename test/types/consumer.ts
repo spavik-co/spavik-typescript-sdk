@@ -3,8 +3,8 @@ import {
   API_VERSION, VERSION, OPERATIONS, verifier,
   type Donnees, type Ligne, type OptionsClient, type OptionsTrain,
   type OptionsEvaluate, type OptionsBacktest, type OptionsForecast, type Engine, type OperationInfo,
-} from '@spavik/client';
-import { verifier as webhookVerifier } from '@spavik/client/webhooks';
+} from 'spavik';
+import { verifier as webhookVerifier } from 'spavik/webhooks';
 
 const options: OptionsClient = { apiKey: 'sk-spv-api-fixture', fetch, backoff: n => n * 10 };
 const client = new Spavik(options);

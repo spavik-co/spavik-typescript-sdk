@@ -8,7 +8,7 @@ const root = resolve('.');
 const work = await mkdtemp(join(tmpdir(), 'spavik-package-'));
 try {
   const report = JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', work], { encoding: 'utf8' }));
-  const packed = Array.isArray(report) ? report[0] : report['@spavik/client'];
+  const packed = Array.isArray(report) ? report[0] : report['spavik'];
   assert(packed.files.some(file => file.path === 'dist/esm/index.d.ts'));
   assert(packed.files.some(file => file.path === 'dist/cjs/index.d.ts'));
   assert(!packed.files.some(file => file.path.startsWith('types/')));
@@ -16,8 +16,8 @@ try {
   await mkdir(consumer);
   await writeFile(join(consumer, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
   execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', join(work, packed.filename)], { cwd: consumer, stdio: 'pipe' });
-  const manifest = JSON.parse(await readFile(join(consumer, 'node_modules/@spavik/client/package.json'), 'utf8'));
-  assert.equal(manifest.name, '@spavik/client');
+  const manifest = JSON.parse(await readFile(join(consumer, 'node_modules/spavik/package.json'), 'utf8'));
+  assert.equal(manifest.name, 'spavik');
   assert.equal(manifest.license, 'Apache-2.0');
   for (const name of ['LICENSE', 'NOTICE', 'CHANGELOG.md']) assert(packed.files.some(file => file.path === name));
   assert(!packed.files.some(file => /(^|\/)\.env($|\.)/.test(file.path)));
@@ -47,13 +47,13 @@ try {
     delete globalThis.crypto;
     assert.equal((await webhook.verifier(body, {'X-Spavik-Signature':signature}, 'fixture')).event, 'model.trained');
   `;
-  await writeFile(join(consumer, 'esm.mjs'), `import * as rootModule from '@spavik/client';
-import * as webhookModule from '@spavik/client/webhooks';
+  await writeFile(join(consumer, 'esm.mjs'), `import * as rootModule from 'spavik';
+import * as webhookModule from 'spavik/webhooks';
 const loadRoot = () => rootModule;
 const loadWebhook = () => webhookModule;
 ${verify}`);
-  await writeFile(join(consumer, 'commonjs.cjs'), `const loadRoot = () => require('@spavik/client');
-const loadWebhook = () => require('@spavik/client/webhooks');
+  await writeFile(join(consumer, 'commonjs.cjs'), `const loadRoot = () => require('spavik');
+const loadWebhook = () => require('spavik/webhooks');
 (async () => { ${verify} })().catch(error => { console.error(error); process.exitCode = 1; });`);
   for (const file of ['esm.mjs', 'commonjs.cjs']) {
     execFileSync(process.execPath, [file], { cwd: consumer, stdio: 'inherit' });

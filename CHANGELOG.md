@@ -9,6 +9,7 @@
 - Use the forecast horizon per call, with all series included, for forecast cost
   reporting.
 - Remove local prediction and forecast estimation helpers.
-- Migrate implementation sources to TypeScript while preserving `@spavik/client`,
-  ESM/CommonJS entry points and the public API.
+- Migrate implementation sources to TypeScript while preserving ESM/CommonJS
+  entry points and the public API.
+- Use `spavik` as the npm package name before the first public release.
 - Forward `pointEstimate` and `quantiles` in forecasting backtests.

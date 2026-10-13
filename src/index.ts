@@ -3,7 +3,7 @@
 // Perimetre moteur : entrainer, predire, prevoir, remonter des verites,
 // integrer, lister, mesurer. Authentification par cle d'usage uniquement.
 //
-//   import { Spavik } from '@spavik/client';
+//   import { Spavik } from 'spavik';
 //
 //   const spavik = new Spavik();                                  // lit SPAVIK_API_KEY
 //   const model  = await spavik.train('churn.csv', { target: 'churn' });

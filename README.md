@@ -14,7 +14,7 @@ Development preview: not yet published to npm. For now,
 After the first release:
 
 ```bash
-npm install @spavik/client
+npm install spavik
 ```
 
 ## Quickstart
@@ -23,10 +23,15 @@ Set `SPAVIK_API_KEY` and `SPAVIK_BASE_URL` for your API environment.
 Use a labeled `customers.csv` with `plan`, `seats` and `churn` columns.
 
 ```typescript
-import { Spavik } from '@spavik/client';
+import { Spavik } from 'spavik';
 
+// Read your API key and API URL from the environment.
 const client = new Spavik();
+
+// Train from past customers: "churn" is the value to predict.
 const model = await client.train('customers.csv', { target: 'churn' });
+
+// Predict churn for a new customer. This call consumes credits.
 const result = await model.predict({ plan: 'pro', seats: 12 });
 console.log(result.lignes);
 ```

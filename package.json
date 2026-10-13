@@ -1,5 +1,5 @@
 {
-  "name": "@spavik/client",
+  "name": "spavik",
   "version": "0.1.0",
   "description": "JavaScript and TypeScript client for the Spavik API: training, prediction, forecasting, feedback loop.",
   "type": "module",
