@@ -19,13 +19,13 @@ npm install spavik
 
 ## Quickstart
 
-Set `SPAVIK_API_KEY` and `SPAVIK_BASE_URL` for your API environment.
+Set `SPAVIK_API_KEY` with your API key.
 Use a labeled `customers.csv` with `plan`, `seats` and `churn` columns.
 
 ```typescript
 import { Spavik } from 'spavik';
 
-// Read your API key and API URL from the environment.
+// Read your API key from SPAVIK_API_KEY.
 const client = new Spavik();
 
 // Train from past customers: "churn" is the value to predict.
@@ -36,7 +36,9 @@ const result = await model.predict({ plan: 'pro', seats: 12 });
 console.log(result.lignes);
 ```
 
-Predictions consume credits.
+This development preview defaults to the test API at
+`https://spavik-gateway-test-bnp1bedb.ew.gateway.dev`.
+`SPAVIK_BASE_URL` is optional; set it only to use another API environment.
 
 ## What you can do
 
