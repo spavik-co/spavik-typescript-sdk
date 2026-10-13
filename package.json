@@ -1,0 +1,71 @@
+{
+  "name": "@spavik/client",
+  "version": "0.1.0",
+  "description": "JavaScript and TypeScript client for the Spavik API: training, prediction, forecasting, feedback loop.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "private": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./webhooks": {
+      "import": {
+        "types": "./dist/esm/webhooks.d.ts",
+        "default": "./dist/esm/webhooks.js"
+      },
+      "require": {
+        "types": "./dist/cjs/webhooks.d.ts",
+        "default": "./dist/webhooks.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "npm run build && node scripts/test.mjs",
+    "types:check": "tsc --noEmit",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run check",
+    "test:package": "npm run build && node scripts/check-package.mjs",
+    "check": "npm run contract:check && npm test && node scripts/check-package.mjs",
+    "contract": "node scripts/generate-contract.mjs",
+    "contract:check": "node scripts/generate-contract.mjs --check"
+  },
+  "devDependencies": {
+    "@types/node": "18.19.130",
+    "typescript": "5.9.3"
+  },
+  "author": "Spavik <admin@spavik.co>",
+  "homepage": "https://spavik.co",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spavik-co/spavik-typescript-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spavik-co/spavik-typescript-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
