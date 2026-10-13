@@ -4,6 +4,25 @@ Open pull requests against `dev`. Describe the problem, the public behavior that
 changes and how you verified it. Use synthetic data; never include API keys or
 customer datasets. Security reports go through [SECURITY.md](SECURITY.md).
 
+## Install from source
+
+Requires Node.js 18 or newer. Until the first npm release:
+
+```sh
+git clone --branch dev https://github.com/spavik-co/spavik-typescript-sdk.git
+cd spavik-typescript-sdk
+npm ci
+npm pack
+```
+
+`npm pack` builds the SDK. From your application's directory, install the archive:
+
+```sh
+npm install /path/to/spavik-typescript-sdk/spavik-client-0.1.0.tgz
+```
+
+Import `Spavik` from `@spavik/client` in JavaScript or TypeScript.
+
 ## Local checks
 
 Run from the repository root:
