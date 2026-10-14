@@ -20,7 +20,7 @@ export type Donnees = Ligne[] | Ligne | string;
 export interface OptionsClient {
   /** API key, prefix `sk-spv-api-`. Defaults to `SPAVIK_API_KEY`. */
   apiKey?: string;
-  /** Defaults to `SPAVIK_BASE_URL` or the built-in test API URL. */
+  /** Defaults to `SPAVIK_BASE_URL` or `https://api.spavik.co`. */
   baseUrl?: string;
   /** Fallback timeout in milliseconds; operations have their own timeouts. */
   timeout?: number;

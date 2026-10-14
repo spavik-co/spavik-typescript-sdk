@@ -2,7 +2,7 @@
 import type { OperationInfo } from './types.js';
 
 export const API_VERSION = "1.0.0";
-export const CONTRAT_SOURCE = "https://spavik-gateway-test-bnp1bedb.ew.gateway.dev";
+export const CONTRAT_SOURCE = "https://test-api.spavik.co";
 export const OPERATIONS: Record<"train" | "predict" | "forecast" | "submit_outcomes" | "refresh" | "list_models" | "performance", OperationInfo> = {
   "train": {
     "method": "POST",

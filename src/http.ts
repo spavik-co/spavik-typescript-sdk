@@ -19,10 +19,8 @@ function env(nom: string) {
   return globalThis.process?.env?.[nom] ?? undefined;
 }
 
-// Environnement de test. A remplacer par l'URL de production avant publication :
-// livrer un client dont le defaut pointe sur un banc d'essai est un piege.
-export const BASE_URL_TEST = 'https://spavik-gateway-test-bnp1bedb.ew.gateway.dev';
-export const BASE_URL_DEFAUT = env('SPAVIK_BASE_URL') || BASE_URL_TEST;
+export const BASE_URL_TEST = 'https://test-api.spavik.co';
+export const BASE_URL_DEFAUT = env('SPAVIK_BASE_URL') || 'https://api.spavik.co';
 
 export function nouvelleCleIdempotence() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().replace(/-/g, '');
