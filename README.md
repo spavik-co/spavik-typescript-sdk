@@ -9,18 +9,40 @@ Add predictive capabilities to your application without building an ML stack.
 
 ## Install
 
-Development preview: not yet published to npm. For now,
-[install from source](CONTRIBUTING.md#install-from-source).
-After the first release:
+Requires Node.js 18 or later; works with TypeScript and JavaScript.
+
+Development preview: not yet published to npm. Install from source:
+
+```sh
+git clone --branch dev https://github.com/spavik-co/spavik-typescript-sdk.git
+cd spavik-typescript-sdk
+npm ci
+npm pack
+```
+
+Then, from your application's directory:
+
+```sh
+npm install /path/to/spavik-typescript-sdk/spavik-0.1.0.tgz
+```
+
+## Get your API key
+
+Create a free account at [spavik.co](https://spavik.co) and generate your API key from the dashboard.
+
+New accounts include **1,000 free predictions**. No credit card required.
 
 ```bash
-npm install spavik
+export SPAVIK_API_KEY="sk-spv-api-..."
 ```
 
 ## Quickstart
 
-Set `SPAVIK_API_KEY` with your API key.
-Use a labeled `customers.csv` with `plan`, `seats` and `churn` columns.
+Download [churn.csv](examples/data/churn.csv) and save it in your application's
+working directory. It contains synthetic customer records with `plan`, `seats`,
+`tickets_90d` and the known outcome `churn`. It demonstrates the API, not model quality.
+
+This example runs as JavaScript too. Save it as `quickstart.mjs` beside the CSV:
 
 ```typescript
 import { Spavik } from 'spavik';
@@ -28,33 +50,32 @@ import { Spavik } from 'spavik';
 // Read your API key from SPAVIK_API_KEY.
 const client = new Spavik();
 
-// Train from past customers: "churn" is the value to predict.
-const model = await client.train('customers.csv', { target: 'churn' });
+// Train on historical customers; "churn" is the value to predict. Training is free.
+const model = await client.train('churn.csv', { target: 'churn' });
 
-// Predict churn for a new customer. This call consumes credits.
-const result = await model.predict({ plan: 'pro', seats: 12 });
+// Predict for a new customer using the same input columns. This consumes credits.
+const result = await model.predict({ plan: 'pro', seats: 12, tickets_90d: 2 });
 console.log(result.lignes);
 ```
 
-The SDK uses `https://api.spavik.co` by default. To use the test environment,
-set the optional `SPAVIK_BASE_URL` to `https://test-api.spavik.co`.
+```sh
+node quickstart.mjs
+```
+
+`result.lignes` contains the predictions returned by the API. Reuse the trained
+model for subsequent predictions; you do not need to train for every request.
 
 ## What you can do
 
-- Classification
-- Regression
-- Forecasting
-- Dataset validation
-- Model performance monitoring
-
-## Why Spavik
-
-Prediction used to require an ML team.
-Now it’s a developer primitive.
+- Classification and regression
+- Time-series forecasting
+- Dataset validation and evaluation
+- Model performance monitoring and outcome feedback
 
 ## Documentation
 
-[docs.spavik.co](https://docs.spavik.co)
+See [docs.spavik.co](https://docs.spavik.co) for guides and the API reference.
+For development and contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
