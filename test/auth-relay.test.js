@@ -16,7 +16,7 @@ for (const apiKey of ['', 'sk-spv-admin-fixture', 'opaque-token']) {
         if (status === 200) assert.equal((await client.usage()).plan, 'free');
         else await assert.rejects(() => client.usage(), SpavikAuthError);
         assert.equal(calls.length, 1);
-        assert.equal(calls[0].headers['X-API-Key'], apiKey || undefined);
+        assert.equal(calls[0].headers['X-Spavik-Api-Key'], apiKey || undefined);
         assert.equal(calls[0].headers.Authorization, undefined);
       } finally {
         if (previous === undefined) delete process.env.SPAVIK_API_KEY;

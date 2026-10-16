@@ -59,7 +59,7 @@ export class ApiSimulee {
       chemin, methode: options.method, entetes: options.headers || {}, corps, params: u.searchParams,
     });
 
-    const presentee = options.headers?.['X-API-Key'];
+    const presentee = options.headers?.['X-Spavik-Api-Key'];
     if (presentee !== CLE) {
       return erreur(401, 'API_KEY_INVALID');
     }

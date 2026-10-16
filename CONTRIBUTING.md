@@ -54,3 +54,11 @@ Add focused regression coverage for behavior changes. Follow the
 [code of conduct](CODE_OF_CONDUCT.md).
 
 See [RELEASING.md](RELEASING.md) for promotion from `dev` and package publication.
+
+## HTTP identity
+
+Requests authenticate with `X-Spavik-Api-Key`. `X-Spavik-Client-Name` is
+`spavik-sdk-javascript`, and `X-Spavik-Client-Version` is the installed SDK version.
+The application can customize its User-Agent with `new Spavik({ userAgent: "my-agent/1.0" })`;
+this does not change the SDK identity headers. Without that option, the
+User-Agent contains the SDK name and version.

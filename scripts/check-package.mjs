@@ -37,7 +37,7 @@ try {
       }
     });
     assert.equal((await client.usage()).credit_balance, 7);
-    assert.equal(calls[0].init.headers['X-API-Key'], 'sk-spv-api-fixture');
+    assert.equal(calls[0].init.headers['X-Spavik-Api-Key'], 'sk-spv-api-fixture');
     assert.equal(calls[0].url, 'https://fixture.invalid/v1/usage');
     const body = '{"event":"model.trained"}';
     const signature = createHmac('sha256', 'fixture').update(body).digest('hex');

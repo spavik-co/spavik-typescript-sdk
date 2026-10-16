@@ -29,6 +29,6 @@ export {
   SpavikValidationError,
 } from './errors.js';
 export { verifier } from './webhooks.js';
-export const VERSION = '0.1.0';
+export { VERSION } from './version.js';
 
 export type { OperationInfo, Ligne, Donnees, OptionsClient, OptionsTrain, OptionsEvaluate, OptionsBacktest, Engine, OptionsForecast } from './types.js';

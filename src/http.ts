@@ -1,3 +1,4 @@
+import { VERSION } from './version.js';
 import type { OptionsClient } from './types.js';
 import type { Requete } from './internal.js';
 import type { SpavikError } from './errors.js';
@@ -118,19 +119,22 @@ export class Transport {
   /** @internal */
   declare readonly timeout: number;
   /** @internal */
+  declare readonly userAgent: string;
+  /** @internal */
   declare readonly maxRetries: number;
   /** @internal */
   declare readonly backoff: (tentative: number) => number;
   /** @internal */
   declare readonly fetch: typeof globalThis.fetch;
   constructor({
-    apiKey, baseUrl, timeout = 30000, fetch: fetchImpl,
+    apiKey, baseUrl, userAgent, timeout = 30000, fetch: fetchImpl,
     maxRetries = REPRISES_MAX, backoff = attente,
   }: OptionsClient = {}) {
     // Une chaine vide ne doit pas reprendre une cle de l'environnement.
     this.cleApi = apiKey ?? env('SPAVIK_API_KEY') ?? '';
     this.baseUrl = (baseUrl || BASE_URL_DEFAUT).replace(/\/+$/, '');
     this.timeout = timeout;
+    this.userAgent = userAgent || `spavik-javascript/${VERSION}`;
     // Politique de reprise, remplacable : certains appelants veulent
     // n'en faire aucune, d'autres attendre autrement.
     this.maxRetries = maxRetries;
@@ -145,12 +149,14 @@ export class Transport {
 
   /** @internal */
   entetes(requete: Requete) {
-    // Les cles API passent exclusivement en X-API-Key ; Bearer est reserve aux JWT.
+    // Les cles API passent exclusivement en X-Spavik-Api-Key ; Bearer est reserve aux JWT.
     const e: Record<string, string> = {
       Accept: 'application/json',
-      'User-Agent': 'spavik-js/0.1.0',
+      'User-Agent': this.userAgent,
+      'X-Spavik-Client-Name': 'spavik-sdk-javascript',
+      'X-Spavik-Client-Version': VERSION,
     };
-    if (this.cleApi) e['X-API-Key'] = this.cleApi;
+    if (this.cleApi) e['X-Spavik-Api-Key'] = this.cleApi;
     if (requete.corps !== undefined && requete.corps !== null) e['Content-Type'] = 'application/json';
     if (requete.idempotence) e['Idempotency-Key'] = requete.idempotence;
     return e;
