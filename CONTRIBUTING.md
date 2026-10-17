@@ -114,3 +114,11 @@ development dependencies. CI repeats this audit on changes and weekly.
 Dependabot proposes reviewed updates against `dev`; updates are not merged
 automatically. Keep `@types/node` aligned with the oldest supported Node LTS
 major (22). The published SDK has no runtime dependencies.
+
+Dependabot checks routine updates on Mondays at 08:00 Europe/Paris. Minor and
+patch updates are grouped into one PR per ecosystem, with at most one open
+routine PR per ecosystem. Major upgrades, including GitHub Actions, require
+an explicit compatibility review and are prepared separately. For TypeScript,
+this keeps `@types/node` on major 22 and TypeScript on major 5 until a reviewed
+migration. Security alerts and security updates are not filtered by this
+version-update policy; the CI vulnerability audits remain enabled.
