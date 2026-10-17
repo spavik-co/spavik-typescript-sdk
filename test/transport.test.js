@@ -21,7 +21,7 @@ test('le requestId remonte dans l exception', async () => {
   const api = new ApiSimulee();
   api.repondra('/v1/models', new Response(
     JSON.stringify({ status: 'error', message: 'TARGET_COLUMN_MISSING', messageDetail: 'detail' }),
-    { status: 422, headers: { 'content-type': 'application/json', 'x-request-id': 'req_abc123' } },
+    { status: 422, headers: { 'content-type': 'application/json', 'x-spavik-request-id': 'req_abc123' } },
   ));
   await assert.rejects(() => client(api).train(CHURN, { target: 'churn' }), (exc) => {
     assert.ok(exc instanceof SpavikValidationError);
@@ -50,7 +50,7 @@ test('reponse HTML ne leve pas une erreur de parsing', async () => {
   const modele = await client(api).train(CHURN, { target: 'churn' });
   api.repondra(`/v1/models/${modele.id}/predict`, new Response(
     '<!DOCTYPE html><html><body><pre>Cannot POST</pre></body></html>',
-    { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'x-request-id': 'req_html' } },
+    { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'x-spavik-request-id': 'req_html' } },
   ));
   await assert.rejects(() => modele.predict([{ plan: 'pro' }]), (exc) => {
     assert.ok(exc instanceof SpavikTransportError);
@@ -115,7 +115,7 @@ test('une prediction rejouee ne debite pas deux fois', async () => {
   const depart = api.solde;
   api.repondra(`/v1/models/${modele.id}/predict`, erreur(503, 'ENGINE_UNAVAILABLE'));
   const resultat = await modele.predict(Array.from({ length: 4 }, () => ({ plan: 'pro' })));
-  assert.equal(resultat.cout, 4);
+  assert.equal(resultat.cout, null);
   assert.equal(depart - api.solde, 4);
 });
 
@@ -167,7 +167,7 @@ test('erreur de la passerelle n est pas prise pour un code', async () => {
   const api = new ApiSimulee();
   api.repondra('/v1/models', new Response(
     JSON.stringify({ code: 404, message: 'The current request is not defined by this API.' }),
-    { status: 404, headers: { 'content-type': 'application/json', 'x-request-id': 'req_gw' } },
+    { status: 404, headers: { 'content-type': 'application/json', 'x-spavik-request-id': 'req_gw' } },
   ));
   await assert.rejects(() => client(api).train(CHURN, { target: 'churn' }), (exc) => {
     assert.ok(exc instanceof SpavikNotFound);

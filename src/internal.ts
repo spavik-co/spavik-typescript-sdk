@@ -17,5 +17,6 @@ export interface ModelData extends ApiRecord {
   version?: number | null;
   task?: string | null;
   engine?: string | null;
+  engine_family?: string | null;
   feature_columns?: string[];
 }

@@ -21,7 +21,7 @@ export const CHURN = [
 function json(statut, corps, entetes = {}) {
   return new Response(JSON.stringify(corps), {
     status: statut,
-    headers: { 'content-type': 'application/json', 'x-request-id': `req_simule${statut}`, ...entetes },
+    headers: { 'content-type': 'application/json', 'Retry-After': '0', 'x-spavik-request-id': `req_simule${statut}`, ...entetes },
   });
 }
 
@@ -84,9 +84,10 @@ export class ApiSimulee {
   }
 
   async _router(chemin, methode, corps, params) {
+    if (chemin === '/v1/engine-families') return json(200, [{ id: 'presage', label: 'Presage', is_default: true }]);
     if (chemin === '/v1/engines') {
       return json(200, [{
-        id: 'tabicl-v2', label: 'TabICL v2', status: 'default', credits: 1, min_plan: null, retires_at: null,
+        id: 'presage-2', label: 'Presage 2', status: 'default', credits: 1, min_plan: null, retires_at: null,
       }]);
     }
 
@@ -139,19 +140,13 @@ export class ApiSimulee {
     }
 
     if (chemin === '/v1/models' && methode === 'POST') {
-      if (!corps.engine) {
-        // L'API refuse un entrainement sans moteur, meme si le contrat ne le
-        // compte pas parmi les champs requis.
-        return erreur(422, 'ENGINE_REQUIRED');
-      }
-      if (corps.engine !== 'tabicl-v2') {
-        // Un moteur hors catalogue : l'API le refuse par son code.
-        return erreur(422, 'ENGINE_UNKNOWN', { messageDetail: `Unknown engine '${corps.engine}'.` });
-      }
+      if ('engine' in corps) throw new Error('Legacy engine field sent');
+      const family = corps.engine_family ?? 'presage';
+      if (!['presage', 'flair', 'prophecy'].includes(family)) return erreur(422, 'VALIDATION_ERROR');
       this._compteur += 1;
       const id = `mdl_test${String(this._compteur).padStart(4, '0')}`;
       this.modeles.set(id, {
-        id, name: corps.name || 'modele', latest_version: 1, task: 'classification',
+        id, name: corps.name || 'modele', latest_version: 1, task: 'classification', engine_family: family, engine: `${family}-2`,
       });
       return json(201, {
         model: this.modeles.get(id),
@@ -266,7 +261,7 @@ export class ApiSimulee {
       if (methode === 'DELETE') {
         // Suppression definitive : artefacts purges. Hors perimetre client.
         this.modeles.delete(id);
-        return new Response(null, { status: 204, headers: { 'x-request-id': 'req_simule204' } });
+        return new Response(null, { status: 204, headers: { 'x-spavik-request-id': 'req_simule204' } });
       }
       const modele = this.modeles.get(id);
       modele.status = chemin.endsWith('/archive') ? 'archived' : 'ready';
@@ -288,7 +283,7 @@ export class ApiSimulee {
     // Route inconnue : la vraie API rend la page d'erreur du serveur, en HTML.
     return new Response(
       `<!DOCTYPE html>\n<html><body><pre>Cannot POST ${chemin}</pre></body></html>`,
-      { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'x-request-id': 'req_html' } },
+      { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'x-spavik-request-id': 'req_html' } },
     );
   }
 }

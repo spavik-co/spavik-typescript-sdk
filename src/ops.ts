@@ -1,4 +1,4 @@
-import type { Donnees, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest } from './types.js';
+import type { Donnees, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict } from './types.js';
 // Les sept operations, decrites une seule fois.
 //
 // Chaque fonction fait tout ce qui ne demande pas le reseau : normaliser les
@@ -18,7 +18,9 @@ function sansVides<T extends Record<string, unknown>>(objet: T): Partial<T> {
   ) as Partial<T>;
 }
 
-export async function train(data: Donnees, { target, engine, name, explain, autoUpdate }: OptionsTrain = {} as OptionsTrain) {
+export async function train(data: Donnees, options: OptionsTrain = {} as OptionsTrain) {
+  if ('engine' in options) throw new SpavikDataError('Use engineFamily when creating a model; engineVersion is selected at prediction time.');
+  const { target, engineFamily, name, explain, autoUpdate } = options;
   const lignes = await normaliser(data, 'training data');
   valider.entrainement(lignes, target);
   return {
@@ -27,7 +29,7 @@ export async function train(data: Donnees, { target, engine, name, explain, auto
       methode: 'POST',
       chemin: '/v1/models',
       operation: 'train',
-      corps: { target, data: lignes, ...sansVides({ engine, name, explain, auto_update: autoUpdate }) },
+      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily, name, explain, auto_update: autoUpdate }) },
       delai: delai('train'),
       idempotence: nouvelleCleIdempotence(),
       contexte: 'training',
@@ -36,12 +38,12 @@ export async function train(data: Donnees, { target, engine, name, explain, auto
 }
 
 export async function forecast(data: Donnees, {
-  target, horizon, timestamp, quantiles, itemId, pointEstimate,
+  target, horizon, timestamp, quantiles, itemId, pointEstimate, engineFamily, engineVersion, backtest, includeBacktestPredictions,
 }: OptionsForecast = {} as OptionsForecast) {
   const lignes = await normaliser(data, 'series to forecast');
   valider.previsions(lignes, target, horizon, timestamp);
   return {
-    cout: valider.coutPrevision(horizon),
+    cout: null,
     requete: {
       methode: 'POST',
       chemin: '/v1/forecast',
@@ -50,7 +52,7 @@ export async function forecast(data: Donnees, {
         target,
         horizon,
         data: lignes,
-        ...sansVides({ timestamp, quantiles, item_id: itemId, point_estimate: pointEstimate }),
+        ...sansVides({ timestamp, quantiles, item_id: itemId, point_estimate: pointEstimate, engine_family: engineFamily, engine_version: engineVersion, backtest, include_backtest_predictions: includeBacktestPredictions }),
       },
       delai: delai('forecast'),
       idempotence: nouvelleCleIdempotence(),
@@ -59,19 +61,18 @@ export async function forecast(data: Donnees, {
   };
 }
 
-export async function predict(modelId: string, rows: Donnees) {
+export async function predict(modelId: string, rows: Donnees, { engineVersion }: OptionsPredict = {}) {
   const lignes = await normaliser(rows, 'rows to score');
   valider.prediction(lignes);
   return {
-    cout: valider.coutPrediction(lignes),
+    cout: null,
     requete: {
       methode: 'POST',
       chemin: `/v1/models/${modelId}/predict`,
       operation: 'predict',
-      corps: { rows: lignes },
+      corps: { rows: lignes, ...sansVides({ engine_version: engineVersion }) },
       delai: delai('predict'),
-      // Le contrat ne declare pas l'en-tete sur cette route, mais l'API
-      // l'honore : la poser protege d'un second debit a la reprise.
+      // Preserve the same key and body throughout retries.
       idempotence: nouvelleCleIdempotence(),
       contexte: 'prediction',
     },
@@ -138,7 +139,9 @@ export function listModels(limit: number, offset: number, status?: 'archived') {
 }
 
 /** Le rapport de validation et un essai du moteur, sans rien creer ni debiter. L'API juge. */
-export async function evaluate(data: Donnees, { target, engine }: OptionsEvaluate = {} as OptionsEvaluate) {
+export async function evaluate(data: Donnees, options: OptionsEvaluate = {} as OptionsEvaluate) {
+  if ('engine' in options) throw new SpavikDataError('Use engineFamily when evaluating data.');
+  const { target, engineFamily } = options;
   const lignes = await normaliser(data, 'data to evaluate');
   return {
     cout: 0,
@@ -146,7 +149,7 @@ export async function evaluate(data: Donnees, { target, engine }: OptionsEvaluat
       methode: 'POST',
       chemin: '/v1/datasets/evaluate',
       operation: 'evaluate',
-      corps: { target, data: lignes, ...sansVides({ engine }) },
+      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily }) },
       delai: delai('train'),
       contexte: 'data evaluation',
     },
@@ -155,7 +158,7 @@ export async function evaluate(data: Donnees, { target, engine }: OptionsEvaluat
 
 /** La serie validee et rejouee contre le naif, sans prevision ni debit. L'API juge. */
 export async function backtest(data: Donnees, {
-  target, horizon, timestamp, itemId, quantiles, pointEstimate,
+  target, horizon, timestamp, itemId, quantiles, pointEstimate, engineFamily, engineVersion, includeBacktestPredictions,
 }: OptionsBacktest = {} as OptionsBacktest) {
   const lignes = await normaliser(data, 'series to backtest');
   // Le seul controle local : l'API prend un horizon nul pour 1 sans le dire.
@@ -168,7 +171,7 @@ export async function backtest(data: Donnees, {
       methode: 'POST',
       chemin: '/v1/forecast/backtest',
       operation: 'backtest',
-      corps: { target, data: lignes, ...sansVides({ horizon, timestamp, item_id: itemId, quantiles, point_estimate: pointEstimate }) },
+      corps: { target, data: lignes, ...sansVides({ horizon, timestamp, item_id: itemId, quantiles, point_estimate: pointEstimate, engine_family: engineFamily, engine_version: engineVersion, include_backtest_predictions: includeBacktestPredictions }) },
       delai: delai('forecast'),
       contexte: 'series backtest',
     },

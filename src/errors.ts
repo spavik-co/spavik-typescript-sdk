@@ -24,6 +24,8 @@ export interface ErrorOptions {
 }
 
 export class SpavikError extends Error {
+  /** Original key for inspecting an uncertain mutation; never replace it automatically. */
+  idempotencyKey: string | null = null;
   readonly code: string | null;
   readonly detail: string | null;
   readonly status: number | null;

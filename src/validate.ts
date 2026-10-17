@@ -169,13 +169,3 @@ export function verites(lignes: ApiRecord[]) {
     );
   }
 }
-
-/** Une ligne scoree, un credit. */
-export function coutPrediction(lignes: ApiRecord[]) {
-  return lignes.length;
-}
-
-/** One credit per requested horizon step, with all series included. */
-export function coutPrevision(horizon: number) {
-  return horizon;
-}

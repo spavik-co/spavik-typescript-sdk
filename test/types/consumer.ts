@@ -2,7 +2,7 @@ import {
   Spavik, Model, Prediction, Prevision, Resultat, SpavikError, SpavikCreditsExhausted,
   API_VERSION, VERSION, OPERATIONS, verifier,
   type Donnees, type Ligne, type OptionsClient, type OptionsTrain,
-  type OptionsEvaluate, type OptionsBacktest, type OptionsForecast, type Engine, type OperationInfo,
+  type OptionsEvaluate, type OptionsBacktest, type OptionsForecast, type Engine, type OperationInfo, type Calibration, type BacktestPrediction, type EngineFamily,
 } from 'spavik';
 import { verifier as webhookVerifier } from 'spavik/webhooks';
 
@@ -10,7 +10,7 @@ const options: OptionsClient = { apiKey: 'sk-spv-api-fixture', fetch, backoff: n
 const client = new Spavik(options);
 const row: Ligne = { x: 1, target: false };
 const data: Donnees = [row];
-const train: OptionsTrain = { target: 'target', engine: 'fixture', autoUpdate: true };
+const train: OptionsTrain = { target: 'target', engineFamily: 'presage', autoUpdate: true };
 const evaluate: OptionsEvaluate = { target: 'target' };
 const backtest: OptionsBacktest = { target: 'target', horizon: 2, pointEstimate: 'median', quantiles: [0.1, 0.9] };
 // @ts-expect-error La statistique doit etre prise en charge par le backtest.
@@ -21,7 +21,14 @@ const strings: string[] = [API_VERSION, VERSION, operation.path, client.baseUrl]
 
 async function workflow(): Promise<void> {
   const model: Model = await client.train(data, train);
-  const prediction: Prediction = await model.predict(row);
+  const prediction: Prediction = await model.predict(row, { engineVersion: 'presage-latest' });
+  const family: string | null = model.engineFamily;
+  const calibration: Calibration | null | undefined = model.training?.calibration;
+  const engineFamilies: EngineFamily[] = await client.engineFamilies();
+  const forecastReport = await client.backtest(data, { target: 'target', engineFamily: 'presage', engineVersion: 'presage-2', includeBacktestPredictions: true });
+  const evaluated: BacktestPrediction[] | null | undefined = forecastReport.backtest?.predictions;
+  const servingEngine: string | null = prediction.engine;
+  const cost: number | null = prediction.cout;
   const result: Resultat = await model.submitOutcomes({ request_id: 'fixture', actual: true });
   const predictions: Record<string, unknown>[] = await model.predictions({ limit: 10 });
   const features: string[] = model.features;

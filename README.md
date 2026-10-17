@@ -9,7 +9,7 @@ Add predictive capabilities to your application without building an ML stack.
 
 ## Install
 
-Requires Node.js 18 or later; works with TypeScript and JavaScript.
+Requires Node.js 22 or later; works with TypeScript and JavaScript.
 
 Development preview: not yet published to npm. Install from source:
 

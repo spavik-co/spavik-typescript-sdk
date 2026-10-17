@@ -1,4 +1,4 @@
-import type { Donnees, Engine, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest } from './types.js';
+import type { Donnees, Engine, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict, EngineFamily, Calibration, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
 import type { ApiRecord, ModelData, Requete } from './internal.js';
 // Client Spavik : les sept operations du perimetre moteur.
 //
@@ -8,19 +8,29 @@ import type { ApiRecord, ModelData, Requete } from './internal.js';
 import * as ops from './ops.js';
 import { normaliser } from './data.js';
 import { Transport } from './http.js';
-import { SpavikConflict, SpavikUnavailable } from './errors.js';
+import { SpavikConflict } from './errors.js';
 
 /** API response data, credit cost, remaining balance and request identifier. */
 export class Resultat {
   declare readonly donnees: ApiRecord;
-  declare readonly cout: number;
+  declare readonly cout: number | null;
   declare readonly solde: number | null;
   declare readonly requestId: string | null;
-  constructor(donnees: ApiRecord | null, cout: number) {
+  constructor(donnees: ApiRecord | null, cout: number | null) {
     this.donnees = donnees || {};
     this.cout = cout;
     this.solde = solde(this.donnees);
     this.requestId = (this.donnees._request_id as string | null) ?? null;
+  }
+
+  /** Initial test-set diagnostic returned by the performance API. */
+  get trainingCalibration(): Calibration | null {
+    return (this.donnees.training_calibration as Calibration | null) ?? null;
+  }
+
+  /** Exact serving engine, distinct from the model data version. */
+  get engine(): string | null {
+    return (this.donnees._engine_version ?? this.donnees.engine) as string | null ?? null;
   }
 
   get<T = unknown>(cle: string, defaut?: T): T {
@@ -51,6 +61,10 @@ export class Prevision extends Resultat {
     return normaliser(this.csv, 'forecast');
   }
 
+  get backtest(): (ApiRecord & { predictions?: BacktestPrediction[] | null }) | null {
+    return (this.donnees.backtest as ApiRecord) ?? null;
+  }
+
   get cible() { return (this.donnees.target as string | null) ?? null; }
 
   get horizon() { return (this.donnees.prediction_length as number | null) ?? null; }
@@ -72,20 +86,6 @@ function solde(brut: ApiRecord): number | null {
   return Number.isInteger(brut._predictions_remaining) ? brut._predictions_remaining as number : null;
 }
 
-/** Les credits que coute une prediction sur ce moteur, 1 si le catalogue ne le dit pas. */
-function prixDuMoteur(entrees: Engine[], moteur: string | null) {
-  if (!moteur || !Array.isArray(entrees)) return 1;
-  const entree = entrees.find((e) => e && e.id === moteur);
-  return Number.isInteger(entree?.credits) && (entree?.credits ?? 0) > 0 ? entree!.credits! : 1;
-}
-
-/** Le moteur marque `default`, sinon le premier de la liste. */
-function moteurParDefaut(entrees: Engine[]) {
-  if (!Array.isArray(entrees) || !entrees.length) return null;
-  const defaut = entrees.find((e) => e && e.status === 'default');
-  return (defaut || entrees[0])?.id ?? null;
-}
-
 // Requete interne, hors du contrat moteur genere.
 const REQUETE_MOTEURS = {
   methode: 'GET',
@@ -95,11 +95,13 @@ const REQUETE_MOTEURS = {
   contexte: 'available engines',
 };
 
-/** Rien a integrer, integration en cours, stockage absent : etats normaux. */
 function refreshAbsorbe(exc: unknown) {
-  if (exc instanceof SpavikUnavailable) return true;
-  return exc instanceof SpavikConflict
-    && ['NO_PENDING_OUTCOMES', 'REFRESH_IN_PROGRESS'].includes(exc.code ?? '');
+  return exc instanceof SpavikConflict && exc.code === 'NO_PENDING_OUTCOMES';
+}
+
+function modelData(response: ApiRecord): ModelData {
+  return { ...((response.model || response) as ModelData),
+    ...(response.version && typeof response.version === 'object' ? { training: response.version } : {}) };
 }
 
 export class Model {
@@ -120,6 +122,12 @@ export class Model {
 
   get engine() { return this._donnees.engine ?? null; }
 
+  get engineFamily() { return this._donnees.engine_family ?? null; }
+
+  get training(): (ApiRecord & { calibration?: Calibration | null }) | null {
+    return (this._donnees.training as ApiRecord) ?? null;
+  }
+
   /** The columns predict must carry (`feature_columns` at the API); empty when not recorded. */
   get features() {
     return Array.isArray(this._donnees.feature_columns) ? [...this._donnees.feature_columns] : [];
@@ -128,10 +136,9 @@ export class Model {
   get donnees() { return { ...this._donnees }; }
 
   /** Score rows. Each row costs the serving engine's credit price. */
-  async predict(rows: Donnees): Promise<Prediction> {
-    const plan = await ops.predict(this.id, rows);
-    const cout = plan.cout * await this._client._prix(this.engine);
-    return new Prediction(await this._client._envoyer(plan.requete), cout);
+  async predict(rows: Donnees, options: OptionsPredict = {}): Promise<Prediction> {
+    const plan = await ops.predict(this.id, rows, options);
+    return new Prediction(await this._client._envoyer(plan.requete), null);
   }
 
   /** The last predictions served by this model, each with its request_id. Free. */
@@ -153,7 +160,7 @@ export class Model {
 
   /**
    * Integrate pending outcomes into a new model version. Free.
-   * Returns `null` when there is nothing to integrate or refresh is unavailable.
+   * Returns `null` only when there are no pending outcomes; other API failures are raised.
    */
   async refresh(): Promise<Resultat | null> {
     const plan = ops.refresh(this.id);
@@ -165,15 +172,10 @@ export class Model {
     }
   }
 
-  /** Observed performance. Returns `null` when analytics are unavailable. */
+  /** Observed performance and initial calibration. API failures are raised. */
   async performance(days = 30): Promise<Resultat | null> {
     const plan = ops.performance(this.id, days);
-    try {
-      return new Resultat(await this._client._envoyer(plan.requete), 0);
-    } catch (exc) {
-      if (exc instanceof SpavikUnavailable) return null;
-      throw exc;
-    }
+    return new Resultat(await this._client._envoyer(plan.requete), 0);
   }
 
   async reload(): Promise<Model> {
@@ -184,53 +186,20 @@ export class Model {
 }
 
 export class Spavik extends Transport {
-  declare private _moteurDefaut: string | null | undefined;
-  declare private _moteurs: Engine[] | undefined;
   /** @internal */
   async _envoyer<T = ApiRecord>(requete: Requete): Promise<T> {
     return this.envoyer<T>(requete);
   }
 
-  /**
-   * Resout le moteur par defaut, une seule fois par client.
-   *
-   * L'API exige `engine` a la creation, alors que le contrat ne le compte pas
-   * parmi les champs requis. Plutot que d'imposer a l'appelant de connaitre le
-   * catalogue des moteurs des sa premiere ligne de code, on va le lire : la
-   * route est publique, gratuite, et la reponse est mise de cote.
-   */
   /** Available engines as the API describes them (id, label, status). Free. */
   async engines(): Promise<Engine[]> {
     const entrees = await this._envoyer<Engine[]>(REQUETE_MOTEURS);
     return Array.isArray(entrees) ? entrees.filter((e) => e && typeof e === 'object').map((e) => ({ ...e })) : [];
   }
 
-  /** @internal */
-  async _moteur(): Promise<string | null> {
-    if (this._moteurDefaut !== undefined) return this._moteurDefaut;
-    this._moteurDefaut = moteurParDefaut(await this._catalogue());
-    return this._moteurDefaut;
-  }
-
-  /** Le catalogue des moteurs, lu une fois par client. Vide si l'API ne repond pas. */
-  /** @internal */
-  async _catalogue(): Promise<Engine[]> {
-    if (this._moteurs === undefined) {
-      try {
-        const entrees = await this._envoyer<Engine[]>(REQUETE_MOTEURS);
-        this._moteurs = Array.isArray(entrees) ? entrees : [];
-      } catch {
-        // Tant pis : l'API dira elle-meme ce qui manque, et elle le dit bien.
-        this._moteurs = [];
-      }
-    }
-    return this._moteurs;
-  }
-
-  /** Credits par prediction sur ce moteur. Sans moteur connu, 1, sans appel. */
-  /** @internal */
-  async _prix(moteur: string | null): Promise<number> {
-    return moteur ? prixDuMoteur(await this._catalogue(), moteur) : 1;
+  /** Families and the configured default, as returned by the API. */
+  async engineFamilies(): Promise<EngineFamily[]> {
+    return this._envoyer({ ...REQUETE_MOTEURS, chemin: '/v1/engine-families' });
   }
 
   /** The account as the API sees it: plan, credit balance, period, consumption. Free. */
@@ -244,7 +213,7 @@ export class Spavik extends Transport {
    * validation, hint, trial and assessment (status, metric, message), unchanged.
    * No fallback conclusion. Creates nothing, charges nothing.
    */
-  async evaluate(data: Donnees, options: OptionsEvaluate): Promise<ApiRecord> {
+  async evaluate(data: Donnees, options: OptionsEvaluate): Promise<EvaluationReport> {
     const plan = await ops.evaluate(data, options);
     const brut = await this._envoyer(plan.requete);
     return brut && typeof brut === 'object' ? { ...brut } : {};
@@ -255,7 +224,7 @@ export class Spavik extends Transport {
    * its history replayed against references. assessment is preserved unchanged.
    * No fallback conclusion, no forecast, no charge.
    */
-  async backtest(data: Donnees, options: OptionsBacktest): Promise<ApiRecord> {
+  async backtest(data: Donnees, options: OptionsBacktest): Promise<BacktestReport> {
     const plan = await ops.backtest(data, options);
     const brut = await this._envoyer(plan.requete);
     return brut && typeof brut === 'object' ? { ...brut } : {};
@@ -280,15 +249,11 @@ export class Spavik extends Transport {
     // Les controles locaux d'abord : un refus prononce ici ne doit toucher ni
     // le reseau ni le catalogue des moteurs.
     const plan = await ops.train(data, options);
-    if (!plan.requete.corps.engine) {
-      const moteur = await this._moteur();
-      if (moteur) plan.requete.corps.engine = moteur;
-    }
     const brut = (await this._envoyer(plan.requete)) || {};
-    return new Model(this, (brut.model || brut) as ModelData);
+    return new Model(this, modelData(brut));
   }
 
-  /** Forecast time series. One credit per requested horizon step per call. */
+  /** Forecast time series. Billed by the API at horizon times the serving engine tariff, all series included. */
   async forecast(data: Donnees, options: OptionsForecast): Promise<Prevision> {
     const plan = await ops.forecast(data, options);
     return new Prevision(await this._envoyer(plan.requete), plan.cout);
@@ -315,6 +280,6 @@ export class Spavik extends Transport {
   async model(modelId: string): Promise<Model> {
     const plan = ops.getModel(modelId);
     const brut = (await this._envoyer(plan.requete)) || {};
-    return new Model(this, (brut.model || brut) as ModelData);
+    return new Model(this, modelData(brut));
   }
 }

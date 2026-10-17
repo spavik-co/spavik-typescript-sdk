@@ -1,3 +1,4 @@
+import { retryAllowed, retryDelay } from './retry.js';
 import { VERSION } from './version.js';
 import type { OptionsClient } from './types.js';
 import type { Requete } from './internal.js';
@@ -6,7 +7,7 @@ import type { SpavikError } from './errors.js';
 //
 // Trois choses s'y jouent, identiques a la bibliotheque Python :
 //   1. Les reprises ne portent que sur ce qui est reprenable : 429, 5xx, pannes
-//      reseau. Jamais un 4xx, qui ne changera pas d'avis.
+//      reseau. REQUEST_IN_PROGRESS (409) is retryable with the original key.
 //   2. La cle d'idempotence est tiree une fois par appel logique et rejouee
 //      telle quelle a chaque tentative. C'est elle qui evite un second debit.
 //   3. Une reponse non JSON leve une erreur nommee, pas une erreur de parsing.
@@ -14,7 +15,6 @@ import type { SpavikError } from './errors.js';
 import { depuisReponse, reponseIllisible, SpavikTransportError } from './errors.js';
 
 export const REPRISES_MAX = 3;
-export const STATUTS_REPRENABLES = new Set([429, 500, 502, 503, 504]);
 
 function env(nom: string) {
   return globalThis.process?.env?.[nom] ?? undefined;
@@ -33,13 +33,7 @@ export function masquer(cle: string) {
   return cle.length > 22 ? `${cle.slice(0, 14)}...${cle.slice(-4)}` : '***';
 }
 
-export function reprenable(statut: number | null, tentative: number, maximum = REPRISES_MAX) {
-  if (tentative >= maximum) return false;
-  if (statut == null) return true;
-  return STATUTS_REPRENABLES.has(statut);
-}
-
-/** Exponentielle avec bruit. L'API n'expose pas de `Retry-After` a ce jour. */
+/** Exponentielle avec bruit. Fallback when the API supplies no retry delay. */
 export function attente(tentative: number) {
   return Math.min(8000, 500 * 2 ** (tentative - 1)) * (0.75 + Math.random() * 0.5);
 }
@@ -63,7 +57,7 @@ function tracer(requete: Requete, statut: number | null, duree: number, requestI
 }
 
 function requestId(entetes: Headers) {
-  return entetes.get('x-request-id') || null;
+  return entetes.get('x-spavik-request-id') || entetes.get('x-request-id') || null;
 }
 
 // Le solde voyage aussi en en-tete : chaque prediction et chaque prevision
@@ -104,7 +98,8 @@ export function interpreter(statut: number, entetes: Headers, texte: string, req
 
   if (corps && typeof corps === 'object' && !Array.isArray(corps)) {
     const objet = corps as Record<string, unknown>;
-    if (objet._request_id === undefined) objet._request_id = rid;
+    objet._request_id = rid;
+    if (entetes.has('x-spavik-model-version')) objet._engine_version = entetes.get('x-spavik-model-version');
     const solde = soldeEntete(entetes);
     if (solde !== null && objet._predictions_remaining === undefined) objet._predictions_remaining = solde;
   }
@@ -189,7 +184,7 @@ export class Transport {
         });
       } catch (exc) {
         tracer(requete, null, Date.now() - debut, null, this.cleApi, tentative);
-        if (reprenable(null, tentative, this.maxRetries)) {
+        if (tentative < this.maxRetries && retryAllowed(null, null, requete)) {
           await dormir(this.backoff(tentative));
           continue;
         }
@@ -204,8 +199,9 @@ export class Transport {
       tracer(requete, reponse.status, Date.now() - debut,
         (corps as Record<string, unknown> | null)?._request_id ?? erreur?.requestId, this.cleApi, tentative);
       if (!erreur) return corps as T;
-      if (reprenable(reponse.status, tentative, this.maxRetries)) {
-        await dormir(this.backoff(tentative));
+      erreur.idempotencyKey = requete.idempotence ?? null;
+      if (tentative < this.maxRetries && retryAllowed(reponse.status, erreur.code, requete)) {
+        await dormir(retryDelay(reponse.headers.get('Retry-After'), erreur.code, this.backoff(tentative)));
         continue;
       }
       throw erreur;

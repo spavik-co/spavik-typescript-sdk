@@ -21,7 +21,7 @@ test('boucle complete', async () => {
 
   const depart = api.solde;
   const prediction = await modele.predict([{ plan: 'pro', seats: 12, tickets_90d: 3 }]);
-  assert.equal(prediction.cout, 1);
+  assert.equal(prediction.cout, null);
   assert.equal(prediction.solde, depart - 1);
   assert.equal(prediction.lignes.length, 1);
   assert.ok(prediction.requestId);
@@ -65,7 +65,7 @@ test('prevision et cout', async () => {
   const serie = Array.from({ length: 28 }, (_, i) => ({ date: `2026-07-${i + 1}`, ventes: 100 + i }));
   const depart = api.solde;
   const resultat = await client(api).forecast(serie, { target: 'ventes', horizon: 7 });
-  assert.equal(resultat.cout, 7);
+  assert.equal(resultat.cout, null);
   assert.equal((await resultat.points()).length, 7);
   assert.equal(depart - api.solde, 7);
 });
@@ -78,26 +78,27 @@ test('appel multi-series coute seulement l horizon', async () => {
     Array.from({ length: 20 }, (_, i) => ({ boutique, ventes: i })));
   assert.equal(api.appels.length, 0);
   const result = await spavik.forecast(serie, { target: 'ventes', horizon: 7, itemId: 'boutique' });
-  assert.equal(result.cout, 7);
+  assert.equal(result.cout, null);
   assert.equal(api.solde, 0);
 });
 
-test('le moteur par defaut est resolu puis garde', async () => {
-  // L'API exige `engine` ; le client va le chercher, une fois pour toutes.
+test('the API owns default engine selection', async () => {
+  // Defaults are omitted from the request and resolved by the API.
   const api = new ApiSimulee();
   const spavik = client(api);
   await spavik.train(CHURN, { target: 'churn' });
-  assert.equal(api.compte('/v1/engines'), 1);
+  assert.equal(api.compte('/v1/engines'), 0);
   const envoye = api.appels.find((a) => a.chemin === '/v1/models' && a.methode === 'POST');
-  assert.equal(envoye.corps.engine, 'tabicl-v2');
+  assert.equal(envoye.corps.engine, undefined);
+  assert.equal(envoye.corps.engine_family, undefined);
 
   await spavik.train(CHURN, { target: 'churn' });
-  assert.equal(api.compte('/v1/engines'), 1, 'le catalogue ne se relit pas a chaque entrainement');
+  assert.equal(api.compte('/v1/engines'), 0, 'le catalogue ne se relit pas a chaque entrainement');
 });
 
 test('un moteur explicite court-circuite la resolution', async () => {
   const api = new ApiSimulee();
-  await client(api).train(CHURN, { target: 'churn', engine: 'tabicl-v2' });
+  await client(api).train(CHURN, { target: 'churn', engineFamily: 'presage' });
   assert.equal(api.compte('/v1/engines'), 0);
 });
 
@@ -112,7 +113,7 @@ test('engines() rend le catalogue tel que l API le decrit', async () => {
   const api = new ApiSimulee();
   const moteurs = await client(api).engines();
   assert.equal(moteurs.length, 1);
-  assert.equal(moteurs[0].id, 'tabicl-v2');
+  assert.equal(moteurs[0].id, 'presage-2');
   assert.equal(moteurs[0].status, 'default');
 });
 
@@ -156,11 +157,11 @@ test('archiver puis restaurer, par identifiant', async () => {
 test('evaluer avant d entrainer', async () => {
   const api = new ApiSimulee();
   const spavik = client(api);
-  const rapport = await spavik.evaluate(CHURN, { target: 'churn', engine: 'tabicl-v2' });
+  const rapport = await spavik.evaluate(CHURN, { target: 'churn', engineFamily: 'presage' });
   const requete = api.appels.at(-1);
   assert.equal(requete.methode, 'POST');
   assert.equal(requete.chemin, '/v1/datasets/evaluate');
-  assert.deepEqual(requete.corps, { data: CHURN, target: 'churn', engine: 'tabicl-v2' });
+  assert.deepEqual(requete.corps, { data: CHURN, target: 'churn', engine_family: 'presage' });
   assert.equal(rapport.trial.verdict.level, 'usable');
   assert.equal(api.solde, 100);
   assert.equal(api.modeles.size, 0);
@@ -186,24 +187,24 @@ test('l historique des predictions porte les request_id', async () => {
   assert.deepEqual((await modele.predictions({ limit: 2 })).map((e) => e.request_id), ['req_p0000', 'req_p0001']);
 });
 
-test('le prix d une prediction est celui du moteur', async () => {
+test('prediction cost is not invented from the training engine tariff', async () => {
   const api = new ApiSimulee();
   api.repondra('/v1/engines', new Response(JSON.stringify([
-    { id: 'tabicl-v2', status: 'default', credits: 1 }, { id: 'big-v1', status: 'preview', credits: 3 },
+    { id: 'presage-2', status: 'default', credits: 1 }, { id: 'big-v1', status: 'preview', credits: 3 },
   ]), { status: 200, headers: { 'content-type': 'application/json' } }));
   const spavik = client(api);
   let modele = await spavik.train(CHURN, { target: 'churn' });
   api.modeles.get(modele.id).engine = 'big-v1'; // servi par un moteur a trois credits
   modele = await spavik.model(modele.id);
   assert.equal(modele.engine, 'big-v1');
-  assert.equal((await modele.predict(Array.from({ length: 4 }, () => ({ plan: 'pro' })))).cout, 12);
-  assert.equal(api.compte('/v1/engines'), 1, 'le catalogue se lit une fois');
+  assert.equal((await modele.predict(Array.from({ length: 4 }, () => ({ plan: 'pro' })))).cout, null);
+  assert.equal(api.compte('/v1/engines'), 0, 'le catalogue se lit une fois');
 });
 
 test('un moteur inconnu est refuse par son code', async () => {
   const api = new ApiSimulee();
-  await assert.rejects(() => client(api).train(CHURN, { target: 'churn', engine: 'nope-v9' }),
-    (e) => e instanceof SpavikError && e.code === 'ENGINE_UNKNOWN');
+  await assert.rejects(() => client(api).train(CHURN, { target: 'churn', engineFamily: 'nope' }),
+    (e) => e instanceof SpavikError && e.code === 'VALIDATION_ERROR');
   assert.ok(erreur);
 });
 

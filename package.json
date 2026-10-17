@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "private": false,
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/esm/index.js",
@@ -50,10 +50,11 @@
     "test:package": "npm run build && node scripts/check-package.mjs",
     "check": "npm run contract:check && npm test && node scripts/check-package.mjs",
     "contract": "node scripts/generate-contract.mjs",
-    "contract:check": "node scripts/generate-contract.mjs --check"
+    "contract:check": "node scripts/generate-contract.mjs --check",
+    "audit": "npm audit --audit-level=low"
   },
   "devDependencies": {
-    "@types/node": "18.19.130",
+    "@types/node": "22.20.5",
     "typescript": "5.9.3"
   },
   "author": "Spavik <admin@spavik.co>",

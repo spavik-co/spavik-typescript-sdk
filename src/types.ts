@@ -37,7 +37,7 @@ export interface OptionsClient {
 export interface OptionsTrain {
   /** Target column to predict. */
   target: string;
-  engine?: string;
+  engineFamily?: string;
   name?: string;
   explain?: boolean;
   autoUpdate?: boolean;
@@ -46,10 +46,13 @@ export interface OptionsTrain {
 export interface OptionsEvaluate {
   /** Target column to predict. */
   target: string;
-  engine?: string;
+  engineFamily?: string;
 }
 
 export interface OptionsBacktest {
+  engineFamily?: string;
+  engineVersion?: string;
+  includeBacktestPredictions?: boolean;
   target: string;
   /** Steps per replayed window, 1 by default. */
   horizon?: number;
@@ -61,7 +64,19 @@ export interface OptionsBacktest {
   pointEstimate?: 'mean' | 'median';
 }
 
+export interface EngineFamily {
+  id: string;
+  label: string;
+  is_default: boolean;
+}
+
+export interface OptionsPredict {
+  engineVersion?: string;
+}
+
 export interface Engine {
+  family?: string;
+  version?: string;
   id: string;
   label?: string;
   status?: 'default' | 'preview' | 'deprecated' | string;
@@ -75,10 +90,54 @@ export interface Engine {
 }
 
 export interface OptionsForecast {
+  engineFamily?: string;
+  engineVersion?: string;
+  backtest?: boolean;
+  includeBacktestPredictions?: boolean;
   target: string;
   horizon: number;
   timestamp?: string;
   quantiles?: number[];
   itemId?: string;
-  pointEstimate?: string;
+  pointEstimate?: 'mean' | 'median';
+}
+
+
+/** Descriptive test-set calibration; this does not recalibrate probabilities. */
+export interface Calibration {
+  available: boolean;
+  unavailable_reason: 'no_evaluated_samples' | 'insufficient_classes' | 'missing_probabilities' | 'invalid_probabilities' | 'unknown_actual_class' | null;
+  evaluated_count: number;
+  evaluated_on: 'test';
+  kind: 'one_vs_rest';
+  interpretation: 'descriptive_only';
+  binning: 'uniform';
+  n_bins: 10;
+  bin_boundaries: 'left_closed_right_open_last_closed';
+  per_class: { class: string; bins: CalibrationBin[] }[];
+}
+export interface CalibrationBin {
+  lower: number;
+  upper: number;
+  count: number;
+  positive_count: number;
+  mean_predicted_probability: number | null;
+  observed_frequency: number | null;
+}
+/** Historical evaluated point, never a future forecast. */
+export interface BacktestPrediction {
+  series: string;
+  window: number;
+  timestamp: string;
+  actual: number;
+  prediction: number;
+  naive_prediction: number;
+  constant_prediction: number;
+  quantiles: Record<string, number>;
+}
+export interface EvaluationReport extends Record<string, unknown> {
+  trial?: (Record<string, unknown> & { calibration?: Calibration | null }) | null;
+}
+export interface BacktestReport extends Record<string, unknown> {
+  backtest?: (Record<string, unknown> & { predictions?: BacktestPrediction[] | null }) | null;
 }

@@ -31,4 +31,4 @@ export {
 export { verifier } from './webhooks.js';
 export { VERSION } from './version.js';
 
-export type { OperationInfo, Ligne, Donnees, OptionsClient, OptionsTrain, OptionsEvaluate, OptionsBacktest, Engine, OptionsForecast } from './types.js';
+export type { OperationInfo, Ligne, Donnees, OptionsClient, OptionsTrain, OptionsEvaluate, OptionsBacktest, Engine, OptionsForecast, OptionsPredict, EngineFamily, Calibration, CalibrationBin, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
