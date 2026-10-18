@@ -1,4 +1,4 @@
-import type { Donnees, Engine, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict, EngineFamily, Calibration, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
+import type { Donnees, Outcome, Engine, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict, EngineFamily, Calibration, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
 import type { ApiRecord, ModelData, Requete } from './internal.js';
 // Client Spavik : les sept operations du perimetre moteur.
 //
@@ -153,7 +153,7 @@ export class Model {
   }
 
   /** Submit observed outcomes. Free. */
-  async submitOutcomes(outcomes: Donnees): Promise<Resultat> {
+  async submitOutcomes(outcomes: Outcome | Outcome[] | Donnees): Promise<Resultat> {
     const plan = await ops.submitOutcomes(this.id, outcomes);
     return new Resultat(await this._client._envoyer(plan.requete), 0);
   }

@@ -1,7 +1,7 @@
 import {
   Spavik, Model, Prediction, Prevision, Resultat, SpavikError, SpavikCreditsExhausted,
   API_VERSION, VERSION, OPERATIONS, verifier,
-  type Donnees, type Ligne, type OptionsClient, type OptionsTrain,
+  type Donnees, type Ligne, type Outcome, type OptionsClient, type OptionsTrain,
   type OptionsEvaluate, type OptionsBacktest, type OptionsForecast, type Engine, type OperationInfo, type Calibration, type BacktestPrediction, type EngineFamily,
 } from 'spavik';
 import { verifier as webhookVerifier } from 'spavik/webhooks';
@@ -30,6 +30,21 @@ async function workflow(): Promise<void> {
   const servingEngine: string | null = prediction.engine;
   const cost: number | null = prediction.cout;
   const result: Resultat = await model.submitOutcomes({ request_id: 'fixture', actual: true });
+  const outcome: Outcome = { features: { plan: 'pro', seats: 12 }, actual: true };
+  const outcomes: Outcome[] = [outcome, { request_id: 'fixture', actual: false }];
+  await model.submitOutcomes(outcome);
+  await model.submitOutcomes(outcomes);
+  await model.submitOutcomes([{ features: { plan: 'pro', seats: 12 }, actual: true }]);
+  await model.submitOutcomes('[{"request_id":"fixture","actual":true}]');
+  // Existing consumers may still pass generic scalar rows.
+  const legacyOutcomes: Donnees = [{ request_id: 'fixture', actual: true }];
+  await model.submitOutcomes(legacyOutcomes);
+  // @ts-expect-error Observations must identify the prediction.
+  const missingReference: Outcome = { actual: true };
+  // @ts-expect-error Observations must include the actual value.
+  const missingActual: Outcome = { features: { seats: 12 } };
+  // @ts-expect-error Features must be a row of scalar values.
+  await model.submitOutcomes({ features: { nested: {} }, actual: true });
   const predictions: Record<string, unknown>[] = await model.predictions({ limit: 10 });
   const features: string[] = model.features;
   const id: string = model.id;

@@ -174,27 +174,42 @@ export class Transport {
       const debut = Date.now();
       const controleur = new AbortController();
       const minuterie = setTimeout(() => controleur.abort(), requete.delai ?? this.timeout);
-      let reponse;
+      let reponse: Response | undefined;
+      let texte: string;
       try {
-        reponse = await this.fetch(this.url(requete.chemin, requete.parametres), {
-          method: requete.methode,
-          headers: this.entetes(requete),
-          body: requete.corps == null ? undefined : JSON.stringify(requete.corps),
-          signal: controleur.signal,
-        });
+        try {
+          reponse = await this.fetch(this.url(requete.chemin, requete.parametres), {
+            method: requete.methode,
+            headers: this.entetes(requete),
+            body: requete.corps == null ? undefined : JSON.stringify(requete.corps),
+            signal: controleur.signal,
+          });
+          texte = await reponse.text();
+        } finally {
+          // Couvrir le corps, puis liberer le delai avant toute attente de reprise.
+          clearTimeout(minuterie);
+        }
       } catch (exc) {
-        tracer(requete, null, Date.now() - debut, null, this.cleApi, tentative);
-        if (tentative < this.maxRetries && retryAllowed(null, null, requete)) {
-          await dormir(this.backoff(tentative));
+        const statut = reponse?.status ?? null;
+        const rid = reponse ? requestId(reponse.headers) : null;
+        tracer(requete, statut, Date.now() - debut, rid, this.cleApi, tentative);
+        // Un corps interrompu apres un 2xx reste une panne reseau. Conserver
+        // les refus HTTP deja connus, notamment 401/403, sans les rejouer.
+        const statutReprise = statut !== null && statut >= 400 ? statut : null;
+        if (tentative < this.maxRetries && retryAllowed(statutReprise, null, requete)) {
+          await dormir(retryDelay(reponse?.headers.get('Retry-After') ?? null, null, this.backoff(tentative)));
           continue;
         }
-        const quoi = (exc as Error).name === 'AbortError' ? 'timed out' : (exc as Error).message;
-        throw new SpavikTransportError(`${requete.contexte || requete.operation}: ${quoi}`);
-      } finally {
-        clearTimeout(minuterie);
+        const quoi = controleur.signal.aborted || (exc instanceof Error && exc.name === 'AbortError')
+          ? 'timed out' : exc instanceof Error ? exc.message : 'network failure';
+        const erreur = new SpavikTransportError(`${requete.contexte || requete.operation}: ${quoi}`, {
+          status: statut, requestId: rid,
+        });
+        erreur.idempotencyKey = requete.idempotence ?? null;
+        erreur.cause = exc;
+        throw erreur;
       }
 
-      const texte = await reponse.text();
       const { corps, erreur } = interpreter(reponse.status, reponse.headers, texte, requete);
       tracer(requete, reponse.status, Date.now() - debut,
         (corps as Record<string, unknown> | null)?._request_id ?? erreur?.requestId, this.cleApi, tentative);

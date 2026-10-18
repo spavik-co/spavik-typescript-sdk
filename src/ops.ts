@@ -1,4 +1,4 @@
-import type { Donnees, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict } from './types.js';
+import type { Donnees, Outcome, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict } from './types.js';
 // Les sept operations, decrites une seule fois.
 //
 // Chaque fonction fait tout ce qui ne demande pas le reseau : normaliser les
@@ -79,7 +79,7 @@ export async function predict(modelId: string, rows: Donnees, { engineVersion }:
   };
 }
 
-export async function submitOutcomes(modelId: string, outcomes: Donnees) {
+export async function submitOutcomes(modelId: string, outcomes: Outcome | Outcome[] | Donnees) {
   const lignes = await normaliser(outcomes, 'outcomes');
   valider.verites(lignes);
   return {

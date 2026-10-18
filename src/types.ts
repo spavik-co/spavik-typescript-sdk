@@ -17,6 +17,12 @@ export type Ligne = Record<string, string | number | boolean | null>;
  */
 export type Donnees = Ligne[] | Ligne | string;
 
+/** An observed outcome, linked by prediction request ID or by its full feature row. */
+export type Outcome = { actual: Ligne[string] } & (
+  | { request_id: string; features?: Ligne }
+  | { request_id?: string; features: Ligne }
+);
+
 export interface OptionsClient {
   /** API key, prefix `sk-spv-api-`. Defaults to `SPAVIK_API_KEY`. */
   apiKey?: string;
@@ -24,7 +30,7 @@ export interface OptionsClient {
   userAgent?: string;
   /** Defaults to `SPAVIK_BASE_URL` or `https://api.spavik.co`. */
   baseUrl?: string;
-  /** Fallback timeout in milliseconds; operations have their own timeouts. */
+  /** Fallback timeout per attempt in milliseconds, including the response body; operations have their own timeouts. */
   timeout?: number;
   /** Custom fetch implementation for testing or a specific runtime. */
   fetch?: typeof globalThis.fetch;

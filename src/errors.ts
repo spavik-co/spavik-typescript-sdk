@@ -44,7 +44,10 @@ export class SpavikError extends Error {
 
 /** Local input rejection. No request was sent or charged. */
 export class SpavikDataError extends SpavikError {}
-/** Network failure or unreadable API response. */
+/**
+ * Network failure or unreadable API response. `idempotencyKey` identifies an
+ * uncertain mutation; a new SDK call generates a new key, so do not retry blindly.
+ */
 export class SpavikTransportError extends SpavikError {}
 /** Missing, invalid, revoked or unauthorized API key. */
 export class SpavikAuthError extends SpavikError {}

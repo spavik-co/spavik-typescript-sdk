@@ -72,6 +72,50 @@ model for subsequent predictions; you do not need to train for every request.
 - Dataset validation and evaluation
 - Model performance monitoring and outcome feedback
 
+## Input data
+
+Pass an array of rows, a single row, raw CSV/JSON text, or a CSV/JSON file path.
+Raw JSON is recognized before file paths, including when values contain URLs.
+Invalid JSON, sparse arrays and non-object rows raise `SpavikDataError` locally.
+
+CSV supports comma, semicolon, tab and pipe separators, quoted delimiters,
+escaped quotes and multiline fields. Duplicate or empty headers, extra fields
+and malformed quoting raise `SpavikDataError` with the physical line number.
+Missing trailing fields and empty values become `null`.
+CSV integer values outside JavaScript's safe integer range remain strings,
+preserving their digits. Decimal values within that range use ordinary
+JavaScript number precision; out-of-range or non-finite values remain strings.
+
+## Observed outcomes
+
+Link an outcome to a prediction using its `request_id` or the full feature row.
+The exported `Outcome` type supports both forms:
+
+```typescript
+import type { Outcome } from 'spavik';
+
+const outcomes: Outcome[] = [
+  { features: { plan: 'pro', seats: 12, tickets_90d: 2 }, actual: true },
+];
+await model.submitOutcomes(outcomes);
+```
+
+## Timeouts and uncertain results
+
+Each attempt's deadline covers both the connection and the complete response
+body. Operations use their contract deadlines; the client `timeout` option is
+a fallback for operations without one, not an override. Retries and backoff can
+make the total call take longer than a single attempt's deadline. Custom `fetch`
+implementations must honor the supplied `AbortSignal`, including during body reads.
+
+Network failures, including interrupted bodies, use `SpavikTransportError`.
+Retries preserve the original payload and idempotency key. After the final
+failure, the error retains `idempotencyKey`, plus `requestId` and `status` when
+response headers arrived. `cause` holds the underlying transport error.
+A mutation may have completed despite a lost response: use these identifiers
+to investigate before resubmitting. A new SDK call generates a new key; the SDK
+does not expose a resume-by-key method.
+
 ## Documentation
 
 See [docs.spavik.co](https://docs.spavik.co) for guides and the API reference.
