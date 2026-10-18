@@ -120,10 +120,36 @@ for (const rows of [[undefined, { x: 1 }], [null], [[], { x: 1 }], Array(2), [, 
   });
 }
 
-test('outcomes accept feature objects and prediction IDs in one batch', async () => {
+test('outcomes preserve mandatory features with optional prediction IDs', async () => {
   const { sent, model } = fixture();
   const outcomes = [{ features: { plan: 'pro', seats: 12 }, actual: true },
-    { request_id: 'prediction_fixture', actual: false }];
+    { request_id: 'prediction_fixture', features: { plan: 'pro', seats: 12 }, actual: false }];
   await model.submitOutcomes(outcomes);
   assert.deepEqual(sent[0].outcomes, outcomes);
 });
+
+test('outcomes preserve original prediction metadata in the HTTP payload', async () => {
+  const { sent, model } = fixture();
+  const classification = Object.freeze({
+    features: Object.freeze({ plan: 'pro', seats: 12 }), actual: 'yes', prediction: 'no',
+    probabilities: Object.freeze({ no: 0.75, yes: 0.25 }), version: 2, engine: 'presage-2',
+  });
+  const regression = Object.freeze({
+    request_id: 'prediction_fixture', features: { plan: 'pro', seats: 12 }, actual: 3, prediction: 2.5, version: 1, engine: 'presage-2',
+  });
+  await model.submitOutcomes(classification);
+  await model.submitOutcomes([classification, regression]);
+  assert.deepEqual(sent, [{ outcomes: [classification] }, { outcomes: [classification, regression] }]);
+});
+
+
+for (const features of [undefined, null, {}, [], 'invalid']) {
+  test(`request ID cannot replace non-empty features: ${JSON.stringify(features)}`, async () => {
+    const { sent, model } = fixture();
+    await assert.rejects(model.submitOutcomes([
+      { features: { seats: 12 }, actual: true },
+      { request_id: 'existing_prediction', features, actual: false },
+    ]), error => error instanceof SpavikDataError && /features.*non-empty object/.test(error.message));
+    assert.deepEqual(sent, []);
+  });
+}

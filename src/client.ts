@@ -141,19 +141,13 @@ export class Model {
     return new Prediction(await this._client._envoyer(plan.requete), null);
   }
 
-  /** The last predictions served by this model, each with its request_id. Free. */
-  async predictions({ limit = 50 }: { limit?: number } = {}): Promise<ApiRecord[]> {
-    const brut = await this._client._envoyer<ApiRecord[]>(ops.predictions(this.id, limit).requete);
-    return Array.isArray(brut) ? brut.filter((e) => e && typeof e === 'object').map((e) => ({ ...e })) : [];
-  }
-
   /** Archive: the model stops serving and frees its slot; everything is kept. Free. */
   async archive() {
     await this._client._envoyer(ops.archive(this.id).requete);
   }
 
-  /** Submit observed outcomes. Free. */
-  async submitOutcomes(outcomes: Outcome | Outcome[] | Donnees): Promise<Resultat> {
+  /** Submit observed outcomes with features and actual on every plan. Free. */
+  async submitOutcomes(outcomes: Outcome | Outcome[] | string): Promise<Resultat> {
     const plan = await ops.submitOutcomes(this.id, outcomes);
     return new Resultat(await this._client._envoyer(plan.requete), 0);
   }

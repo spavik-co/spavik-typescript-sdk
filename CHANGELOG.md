@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Require non-empty `features` and `actual` for every outcome, regardless of
+  data policy. `request_id` is optional correlation metadata. Inference archival
+  policy does not change validation, performance or idempotent response replay.
+
+- Align `Outcome` with the API's `prediction`, `probabilities`, `version` and
+  `engine` fields, requiring the original version and engine for supplied predictions.
+- Remove `model.predictions()`: prediction history has been removed from the
+  API for every plan. Keep prediction results and their `request_id` values
+  from `predict()` in your application.
+
 - Preserve multiline and quoted CSV fields, reject ambiguous headers and excess
   columns, and keep unsafe numeric values as text.
 - Cover response bodies with request deadlines and network retries; retain

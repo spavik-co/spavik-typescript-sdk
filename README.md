@@ -88,17 +88,38 @@ JavaScript number precision; out-of-range or non-finite values remain strings.
 
 ## Observed outcomes
 
-Link an outcome to a prediction using its `request_id` or the full feature row.
-The exported `Outcome` type supports both forms:
+Every outcome requires a non-empty `features` object and `actual`, on every
+plan. An optional `request_id` is correlation metadata; no inference archive
+is queried to recover features. The exported `Outcome` type also accepts the original prediction
+and optional class probabilities for aggregate performance measurement. When
+providing `prediction`, include its original model `version` and exact serving
+`engine`, not an alias such as `presage-latest`:
 
 ```typescript
 import type { Outcome } from 'spavik';
 
 const outcomes: Outcome[] = [
-  { features: { plan: 'pro', seats: 12, tickets_90d: 2 }, actual: true },
+  {
+    features: { plan: 'pro', seats: 12, tickets_90d: 2 },
+    actual: 'yes',
+    prediction: 'no',
+    probabilities: { no: 0.75, yes: 0.25 },
+    version: 2,
+    engine: 'presage-2',
+  },
 ];
 await model.submitOutcomes(outcomes);
 ```
+
+The prediction metadata above is illustrative; use the values saved from the
+original prediction response. Probability values must be between 0 and 1, and
+the model version must be a positive integer; the API validates these bounds.
+Performance uses these client-reported predictions for every data policy;
+feedback without a supplied prediction remains supported for model refresh.
+Zero Data Retention only disables GCS/BigQuery archiving of inference inputs
+and outputs. Successful idempotent responses remain replayable from the
+PostgreSQL technical cache for 24 hours on every plan. Submit outcomes in
+batches, especially when automatic model updates are enabled.
 
 ## Timeouts and uncertain results
 
@@ -124,3 +145,10 @@ For development and contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 [Apache-2.0](LICENSE)
+
+## Saving prediction results
+
+There is no prediction-history endpoint on any plan, and no
+`model.predictions()` method. Save the results and `request_id` values returned
+by `model.predict()` in your application if you need them later. The API request
+log contains technical metadata, not prediction values.

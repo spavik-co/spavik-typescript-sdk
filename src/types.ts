@@ -17,10 +17,25 @@ export type Ligne = Record<string, string | number | boolean | null>;
  */
 export type Donnees = Ligne[] | Ligne | string;
 
-/** An observed outcome, linked by prediction request ID or by its full feature row. */
-export type Outcome = { actual: Ligne[string] } & (
-  | { request_id: string; features?: Ligne }
-  | { request_id?: string; features: Ligne }
+/**
+ * An observed outcome with its full feature row, required on every plan.
+ * The optional request ID is correlation metadata, never an archive lookup.
+ */
+export type Outcome = {
+  features: Ligne;
+  request_id?: string;
+  actual: string | number | boolean;
+  /** Original prediction for aggregate performance measurement; requires version and engine. */
+  prediction?: string | number | boolean;
+  /** Original class probabilities, with each value between 0 and 1. */
+  probabilities?: Record<string, number>;
+  /** Positive integer identifying the model version that produced the prediction. */
+  version?: number;
+  /** Exact serving engine identifier, such as presage-2; aliases are not accepted. */
+  engine?: string;
+} & (
+  | { prediction?: undefined }
+  | { prediction: string | number | boolean; version: number; engine: string }
 );
 
 export interface OptionsClient {

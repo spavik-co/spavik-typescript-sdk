@@ -27,9 +27,9 @@ test('boucle complete', async () => {
   assert.ok(prediction.requestId);
 
   const verites = await modele.submitOutcomes([
-    { request_id: 'req_1', actual: 1 },
-    { request_id: 'req_2', actual: 0 },
-    { request_id: 'req_3', actual: 1 },
+    { request_id: 'req_1', features: { plan: 'pro', seats: 12, tickets_90d: 3 }, actual: 1 },
+    { request_id: 'req_2', features: { plan: 'pro', seats: 12, tickets_90d: 3 }, actual: 0 },
+    { request_id: 'req_3', features: { plan: 'pro', seats: 12, tickets_90d: 3 }, actual: 1 },
   ]);
   assert.equal(verites.get('accepted'), 3);
   assert.equal(verites.cout, 0);
@@ -179,12 +179,11 @@ test('backtester une serie', async () => {
   assert.equal(api.solde, 100);
 });
 
-test('l historique des predictions porte les request_id', async () => {
+test('la reponse de prediction porte les request_id', async () => {
   const api = new ApiSimulee();
   const modele = await client(api).train(CHURN, { target: 'churn' });
   const r = await modele.predict(Array.from({ length: 3 }, () => ({ plan: 'pro' })));
   assert.deepEqual(r.lignes.map((l) => l.request_id), ['req_p0000', 'req_p0001', 'req_p0002']);
-  assert.deepEqual((await modele.predictions({ limit: 2 })).map((e) => e.request_id), ['req_p0000', 'req_p0001']);
 });
 
 test('prediction cost is not invented from the training engine tariff', async () => {

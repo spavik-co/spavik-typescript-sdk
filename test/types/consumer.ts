@@ -29,23 +29,52 @@ async function workflow(): Promise<void> {
   const evaluated: BacktestPrediction[] | null | undefined = forecastReport.backtest?.predictions;
   const servingEngine: string | null = prediction.engine;
   const cost: number | null = prediction.cout;
-  const result: Resultat = await model.submitOutcomes({ request_id: 'fixture', actual: true });
+  const result: Resultat = await model.submitOutcomes({ request_id: 'fixture', features: { seats: 12 }, actual: true });
   const outcome: Outcome = { features: { plan: 'pro', seats: 12 }, actual: true };
-  const outcomes: Outcome[] = [outcome, { request_id: 'fixture', actual: false }];
+  const outcomes: Outcome[] = [outcome, { request_id: 'fixture', features: { seats: 12 }, actual: false }];
   await model.submitOutcomes(outcome);
   await model.submitOutcomes(outcomes);
   await model.submitOutcomes([{ features: { plan: 'pro', seats: 12 }, actual: true }]);
-  await model.submitOutcomes('[{"request_id":"fixture","actual":true}]');
-  // Existing consumers may still pass generic scalar rows.
+  const measuredOutcome: Outcome = {
+    features: { plan: 'pro', seats: 12 }, actual: 'yes', prediction: 'no',
+    probabilities: { no: 0.75, yes: 0.25 }, version: 2, engine: 'presage-2',
+  };
+  const measuredOutcomes: Outcome[] = [measuredOutcome,
+    { request_id: 'fixture-regression', features: { seats: 12 }, actual: 3, prediction: 2.5, version: 1, engine: 'presage-2' },
+    { features: { seats: 12 }, actual: false, prediction: true, version: 2, engine: 'presage-2' },
+  ];
+  await model.submitOutcomes(measuredOutcome);
+  await model.submitOutcomes(measuredOutcomes);
+  await model.submitOutcomes([{ features: { seats: 12 }, actual: true, prediction: false,
+    probabilities: { false: 0.8, true: 0.2 }, version: 2, engine: 'presage-2' }]);
+  // @ts-expect-error A supplied prediction requires its original model version.
+  const missingModelVersion: Outcome = { features: { seats: 12 }, actual: true, prediction: false, engine: 'presage-2' };
+  // @ts-expect-error A supplied prediction requires its exact serving engine.
+  const missingServingEngine: Outcome = { request_id: 'fixture', features: { seats: 12 }, actual: 3, prediction: 2.5, version: 1 };
+  // @ts-expect-error Probability values must be numeric.
+  const invalidProbability: Outcome = { features: { seats: 12 }, actual: 'yes', probabilities: { yes: '0.8' } };
+  // @ts-expect-error Model versions are numeric.
+  const invalidOutcomeVersion: Outcome = { request_id: 'fixture', features: { seats: 12 }, actual: 3, version: '2' };
+  // @ts-expect-error Engine identifiers are strings.
+  const invalidOutcomeEngine: Outcome = { request_id: 'fixture', features: { seats: 12 }, actual: 3, engine: 2 };
+  // @ts-expect-error Predictions must be scalar values accepted by the API.
+  const invalidOutcomePrediction: Outcome = { features: { seats: 12 }, actual: true, prediction: {}, version: 2, engine: 'presage-2' };
+  await model.submitOutcomes('[{"features":{"seats":12},"actual":true}]');
   const legacyOutcomes: Donnees = [{ request_id: 'fixture', actual: true }];
+  // @ts-expect-error Generic scalar rows cannot bypass required outcome features.
   await model.submitOutcomes(legacyOutcomes);
-  // @ts-expect-error Observations must identify the prediction.
+  // @ts-expect-error A request ID never replaces features.
+  const withoutFeatures: Outcome = { request_id: 'fixture', actual: true };
+  // @ts-expect-error submitOutcomes also requires features when a request ID is present.
+  await model.submitOutcomes({ request_id: 'fixture', actual: true });
+  // @ts-expect-error Observations must include features.
   const missingReference: Outcome = { actual: true };
   // @ts-expect-error Observations must include the actual value.
   const missingActual: Outcome = { features: { seats: 12 } };
   // @ts-expect-error Features must be a row of scalar values.
   await model.submitOutcomes({ features: { nested: {} }, actual: true });
-  const predictions: Record<string, unknown>[] = await model.predictions({ limit: 10 });
+  // @ts-expect-error Prediction history is no longer part of the API.
+  await model.predictions({ limit: 10 });
   const features: string[] = model.features;
   const id: string = model.id;
   const version: number | null = model.version;

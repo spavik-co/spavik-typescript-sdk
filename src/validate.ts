@@ -143,9 +143,8 @@ export function previsions(lignes: ApiRecord[], cible: string, horizon: number, 
 /**
  * Chaque verite dit ce qui est arrive, et de quelle prediction elle parle.
  *
- * `actual` porte la valeur observee. L'identification passe soit par le
- * `request_id` de la prediction d'origine, soit par les caracteristiques
- * completes de la ligne. Sans l'un ou l'autre, l'API ne peut rien rattacher.
+ * `actual` porte la valeur observee et `features` la ligne complete.
+ * `request_id` reste une correlation facultative, sans recherche d'archive.
  */
 export function verites(lignes: ApiRecord[]) {
   if (!lignes.length) throw new SpavikDataError('no outcomes to report. Nothing was sent.');
@@ -160,12 +159,13 @@ export function verites(lignes: ApiRecord[]) {
     );
   }
 
-  const orphelines = lignes.filter((v) => !v.request_id && !v.features);
-  if (orphelines.length) {
+  const invalides = lignes.filter((v) => !v.features || typeof v.features !== 'object'
+    || Array.isArray(v.features) || !Object.keys(v.features).length);
+  if (invalides.length) {
     throw new SpavikDataError(
-      `${orphelines.length} outcome(s) out of ${lignes.length} do not say which `
-      + "prediction they relate to. Provide 'request_id', that of the original "
-      + "prediction, or 'features', the full row.",
+      `${invalides.length} outcome(s) out of ${lignes.length} require `
+      + "'features' as a non-empty object. 'request_id' is optional "
+      + 'correlation metadata and cannot replace features.',
     );
   }
 }

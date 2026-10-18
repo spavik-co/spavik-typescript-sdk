@@ -188,13 +188,6 @@ export class ApiSimulee {
       }, { 'X-Spavik-Predictions-Remaining': String(this.solde) });
     }
 
-    if (chemin.endsWith('/predictions')) {
-      const n = Math.min(Number(params.get('limit') || 50), this._scores);
-      return json(200, Array.from({ length: n }, (_, i) => ({
-        request_id: `req_p${String(i).padStart(4, '0')}`, prediction: 1, scored_at: '2026-09-14T10:00:00Z',
-      })));
-    }
-
     if (chemin.endsWith('/outcomes')) {
       const recues = (corps.outcomes || []).length;
       this.pendingOutcomes += recues;

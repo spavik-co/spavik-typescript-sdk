@@ -79,7 +79,7 @@ export async function predict(modelId: string, rows: Donnees, { engineVersion }:
   };
 }
 
-export async function submitOutcomes(modelId: string, outcomes: Outcome | Outcome[] | Donnees) {
+export async function submitOutcomes(modelId: string, outcomes: Outcome | Outcome[] | string) {
   const lignes = await normaliser(outcomes, 'outcomes');
   valider.verites(lignes);
   return {
@@ -204,20 +204,6 @@ export function restore(modelId: string) {
       delai: 30000,
       idempotence: nouvelleCleIdempotence(),
       contexte: `restoring model ${modelId}`,
-    },
-  };
-}
-
-export function predictions(modelId: string, limit: number) {
-  return {
-    cout: 0,
-    requete: {
-      methode: 'GET',
-      chemin: `/v1/models/${modelId}/predictions`,
-      operation: 'predictions',
-      parametres: { limit },
-      delai: delai('list_models'),
-      contexte: `prediction history of ${modelId}`,
     },
   };
 }

@@ -99,7 +99,7 @@ test('verite sans rattachement', async () => {
   api.appels.length = 0;
   await assert.rejects(
     () => modele.submitOutcomes([{ actual: 1 }]),
-    /which prediction/,
+    /'features' as a non-empty object/,
   );
   assert.equal(api.appels.length, 0);
 });
