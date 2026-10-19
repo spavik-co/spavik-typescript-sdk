@@ -39,13 +39,14 @@ try {
     assert.equal((await client.usage()).credit_balance, 7);
     assert.equal(calls[0].init.headers['X-Spavik-Api-Key'], 'sk-spv-api-fixture');
     assert.equal(calls[0].url, 'https://fixture.invalid/v1/usage');
-    const body = '{"event":"model.trained"}';
-    const signature = createHmac('sha256', 'fixture').update(body).digest('hex');
-    assert.equal((await webhook.verifier(body, {'X-Spavik-Signature':signature}, 'fixture')).event, 'model.trained');
+    const body = '{"type":"model.trained"}';
+    const stamp = Math.floor(Date.now() / 1000);
+    const signature = 't=' + stamp + ',v1=' + createHmac('sha256', 'fixture').update(stamp + '.').update(body).digest('hex');
+    assert.equal((await webhook.verifier(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
     await assert.rejects(webhook.verifier(body, {}, 'fixture'), sdk.SpavikSignatureError);
     assert.equal(webhook.verifier, sdk.verifier);
     delete globalThis.crypto;
-    assert.equal((await webhook.verifier(body, {'X-Spavik-Signature':signature}, 'fixture')).event, 'model.trained');
+    assert.equal((await webhook.verifier(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
   `;
   await writeFile(join(consumer, 'esm.mjs'), `import * as rootModule from 'spavik';
 import * as webhookModule from 'spavik/webhooks';
