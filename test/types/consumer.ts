@@ -1,21 +1,21 @@
 import {
-  Spavik, Model, Prediction, Prevision, Resultat, SpavikError, SpavikCreditsExhausted,
-  API_VERSION, VERSION, OPERATIONS, verifier,
-  type Donnees, type Ligne, type Outcome, type OptionsClient, type OptionsTrain,
-  type OptionsEvaluate, type OptionsBacktest, type OptionsForecast, type Engine, type OperationInfo, type Calibration, type BacktestPrediction, type EngineFamily,
+  Spavik, Model, Prediction, Forecast, Result, SpavikError, SpavikCreditsExhausted,
+  API_VERSION, VERSION, OPERATIONS, verify,
+  type DataInput, type Row, type Outcome, type ClientOptions, type TrainOptions,
+  type EvaluateOptions, type BacktestOptions, type ForecastOptions, type Engine, type OperationInfo, type Calibration, type BacktestPrediction, type EngineFamily,
 } from 'spavik';
-import { verifier as webhookVerifier } from 'spavik/webhooks';
+import { verify as webhookVerifier } from 'spavik/webhooks';
 
-const options: OptionsClient = { apiKey: 'sk-spv-api-fixture', fetch, backoff: n => n * 10 };
+const options: ClientOptions = { apiKey: 'sk-spv-api-fixture', fetch, backoff: n => n * 10 };
 const client = new Spavik(options);
-const row: Ligne = { x: 1, target: false };
-const data: Donnees = [row];
-const train: OptionsTrain = { target: 'target', engineFamily: 'presage', autoUpdate: true };
-const evaluate: OptionsEvaluate = { target: 'target' };
-const backtest: OptionsBacktest = { target: 'target', horizon: 2, pointEstimate: 'median', quantiles: [0.1, 0.9] };
+const row: Row = { x: 1, target: false };
+const data: DataInput = [row];
+const train: TrainOptions = { target: 'target', engineFamily: 'presage', autoUpdate: true };
+const evaluate: EvaluateOptions = { target: 'target' };
+const backtest: BacktestOptions = { target: 'target', horizon: 2, pointEstimate: 'median', quantiles: [0.1, 0.9] };
 // @ts-expect-error La statistique doit etre prise en charge par le backtest.
-const invalidBacktest: OptionsBacktest = { target: 'target', pointEstimate: 'mode' };
-const forecast: OptionsForecast = { target: 'target', horizon: 2, quantiles: [0.5] };
+const invalidBacktest: BacktestOptions = { target: 'target', pointEstimate: 'mode' };
+const forecast: ForecastOptions = { target: 'target', horizon: 2, quantiles: [0.5] };
 const operation: OperationInfo = OPERATIONS.forecast;
 const strings: string[] = [API_VERSION, VERSION, operation.path, client.baseUrl];
 
@@ -28,8 +28,8 @@ async function workflow(): Promise<void> {
   const forecastReport = await client.backtest(data, { target: 'target', engineFamily: 'presage', engineVersion: 'presage-2', includeBacktestPredictions: true });
   const evaluated: BacktestPrediction[] | null | undefined = forecastReport.backtest?.predictions;
   const servingEngine: string | null = prediction.engine;
-  const cost: number | null = prediction.cout;
-  const result: Resultat = await model.submitOutcomes({ request_id: 'fixture', features: { seats: 12 }, actual: true });
+  const cost: number | null = prediction.cost;
+  const result: Result = await model.submitOutcomes({ request_id: 'fixture', features: { seats: 12 }, actual: true });
   const outcome: Outcome = { features: { plan: 'pro', seats: 12 }, actual: true };
   const outcomes: Outcome[] = [outcome, { request_id: 'fixture', features: { seats: 12 }, actual: false }];
   await model.submitOutcomes(outcome);
@@ -60,7 +60,7 @@ async function workflow(): Promise<void> {
   // @ts-expect-error Predictions must be scalar values accepted by the API.
   const invalidOutcomePrediction: Outcome = { features: { seats: 12 }, actual: true, prediction: {}, version: 2, engine: 'presage-2' };
   await model.submitOutcomes('[{"features":{"seats":12},"actual":true}]');
-  const legacyOutcomes: Donnees = [{ request_id: 'fixture', actual: true }];
+  const legacyOutcomes: DataInput = [{ request_id: 'fixture', actual: true }];
   // @ts-expect-error Generic scalar rows cannot bypass required outcome features.
   await model.submitOutcomes(legacyOutcomes);
   // @ts-expect-error A request ID never replaces features.
@@ -79,18 +79,18 @@ async function workflow(): Promise<void> {
   const id: string = model.id;
   const version: number | null = model.version;
   const requestId: string | null = prediction.requestId;
-  const balance: number | null = prediction.solde;
+  const balance: number | null = prediction.predictionsRemaining;
   const value: number = result.get<number>('value', 0);
   const engines: Engine[] = await client.engines();
   const report: Record<string, unknown> = await client.evaluate(data, evaluate);
   await client.backtest(data, backtest);
   await client.usage();
-  const future: Prevision = await client.forecast(data, forecast);
+  const future: Forecast = await client.forecast(data, forecast);
   const horizon: number | null = future.horizon;
   const series: number | null = future.series;
   await future.points();
-  const refreshed: Resultat | null = await model.refresh();
-  const performance: Resultat | null = await model.performance(7);
+  const refreshed: Result | null = await model.refresh();
+  const performance: Result | null = await model.performance(7);
   for await (const entry of client.models({ status: 'archived' })) {
     const current: Model = entry;
     await current.reload();
@@ -100,7 +100,7 @@ async function workflow(): Promise<void> {
   await client.archive(id);
   await client.restore(id);
   const headers = new Headers();
-  const event: Record<string, unknown> = await verifier(new Uint8Array(), headers, 'fixture');
+  const event: Record<string, unknown> = await verify(new Uint8Array(), headers, 'fixture');
   await webhookVerifier(new ArrayBuffer(0), {}, 'fixture', { tolerance: 60 });
   try { await model.predict(data); } catch (error) {
     if (error instanceof SpavikError) {
@@ -108,7 +108,7 @@ async function workflow(): Promise<void> {
       const status: number | null = error.status;
     }
     if (error instanceof SpavikCreditsExhausted) {
-      const required: number | null = error.required;
+      const code: string | null = error.code;
     }
   }
   // @ts-expect-error La cible est obligatoire.

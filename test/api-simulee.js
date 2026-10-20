@@ -152,7 +152,6 @@ export class ApiSimulee {
         model: this.modeles.get(id),
         version: { version: 1, id: 'ver_1' },
         validation: { row_count: (corps.data || []).length },
-        credits_remaining: this.solde,
       });
     }
 
@@ -171,12 +170,12 @@ export class ApiSimulee {
     if (chemin.endsWith('/predict')) {
       const lignes = corps.rows || [];
       if (lignes.length > this.solde) {
-        return erreur(402, 'CREDITS_EXHAUSTED', { balance: this.solde, required: lignes.length });
+        return erreur(402, 'CREDITS_EXHAUSTED');
       }
       this.solde -= lignes.length;
       const base = this._scores;
       this._scores += lignes.length;
-      // Un request_id par ligne, comme l'API ; le solde dans le corps ET en en-tete.
+      // Un request_id par ligne, comme l'API ; le reste en en-tete seulement.
       return json(200, {
         model_id: chemin.split('/')[3],
         version: 1,
@@ -184,7 +183,6 @@ export class ApiSimulee {
         predictions: lignes.map((_, i) => ({
           request_id: `req_p${String(base + i).padStart(4, '0')}`, prediction: 1, proba_0: 0.2, proba_1: 0.8,
         })),
-        credits_remaining: this.solde,
       }, { 'X-Spavik-Predictions-Remaining': String(this.solde) });
     }
 
@@ -230,7 +228,7 @@ export class ApiSimulee {
 
     if (chemin === '/v1/forecast') {
       const horizon = corps.horizon || 1;
-      if (horizon > this.solde) return erreur(402, 'CREDITS_EXHAUSTED', { balance: this.solde });
+      if (horizon > this.solde) return erreur(402, 'CREDITS_EXHAUSTED');
       this.solde -= horizon;
       const cible = corps.target || 'valeur';
       const lignes = [`date,${cible}_prediction`];

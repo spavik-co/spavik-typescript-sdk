@@ -1,4 +1,4 @@
-import type { Donnees, Outcome, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict } from './types.js';
+import type { DataInput, Outcome, TrainOptions, ForecastOptions, EvaluateOptions, BacktestOptions, PredictOptions } from './types.js';
 // Les sept operations, decrites une seule fois.
 //
 // Chaque fonction fait tout ce qui ne demande pas le reseau : normaliser les
@@ -18,7 +18,7 @@ function sansVides<T extends Record<string, unknown>>(objet: T): Partial<T> {
   ) as Partial<T>;
 }
 
-export async function train(data: Donnees, options: OptionsTrain = {} as OptionsTrain) {
+export async function train(data: DataInput, options: TrainOptions = {} as TrainOptions) {
   if ('engine' in options) throw new SpavikDataError('Use engineFamily when creating a model; engineVersion is selected at prediction time.');
   const { target, engineFamily, name, explain, autoUpdate } = options;
   const lignes = await normaliser(data, 'training data');
@@ -37,9 +37,9 @@ export async function train(data: Donnees, options: OptionsTrain = {} as Options
   };
 }
 
-export async function forecast(data: Donnees, {
+export async function forecast(data: DataInput, {
   target, horizon, timestamp, quantiles, itemId, pointEstimate, engineFamily, engineVersion, backtest, includeBacktestPredictions,
-}: OptionsForecast = {} as OptionsForecast) {
+}: ForecastOptions = {} as ForecastOptions) {
   const lignes = await normaliser(data, 'series to forecast');
   valider.previsions(lignes, target, horizon, timestamp);
   return {
@@ -61,7 +61,7 @@ export async function forecast(data: Donnees, {
   };
 }
 
-export async function predict(modelId: string, rows: Donnees, { engineVersion }: OptionsPredict = {}) {
+export async function predict(modelId: string, rows: DataInput, { engineVersion }: PredictOptions = {}) {
   const lignes = await normaliser(rows, 'rows to score');
   valider.prediction(lignes);
   return {
@@ -139,7 +139,7 @@ export function listModels(limit: number, offset: number, status?: 'archived') {
 }
 
 /** Le rapport de validation et un essai du moteur, sans rien creer ni debiter. L'API juge. */
-export async function evaluate(data: Donnees, options: OptionsEvaluate = {} as OptionsEvaluate) {
+export async function evaluate(data: DataInput, options: EvaluateOptions = {} as EvaluateOptions) {
   if ('engine' in options) throw new SpavikDataError('Use engineFamily when evaluating data.');
   const { target, engineFamily } = options;
   const lignes = await normaliser(data, 'data to evaluate');
@@ -157,9 +157,9 @@ export async function evaluate(data: Donnees, options: OptionsEvaluate = {} as O
 }
 
 /** La serie validee et rejouee contre le naif, sans prevision ni debit. L'API juge. */
-export async function backtest(data: Donnees, {
+export async function backtest(data: DataInput, {
   target, horizon, timestamp, itemId, quantiles, pointEstimate, engineFamily, engineVersion, includeBacktestPredictions,
-}: OptionsBacktest = {} as OptionsBacktest) {
+}: BacktestOptions = {} as BacktestOptions) {
   const lignes = await normaliser(data, 'series to backtest');
   // Le seul controle local : l'API prend un horizon nul pour 1 sans le dire.
   if (horizon != null && horizon < 1) {

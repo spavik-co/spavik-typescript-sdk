@@ -11,7 +11,7 @@
 
 export { API_VERSION, OPERATIONS } from './contract.js';
 export {
-  Model, Prediction, Prevision, Resultat, Spavik,
+  Model, Prediction, Forecast, Result, Spavik,
 } from './client.js';
 export {
   SpavikAuthError,
@@ -28,7 +28,7 @@ export {
   SpavikUnavailable,
   SpavikValidationError,
 } from './errors.js';
-export { verifier } from './webhooks.js';
+export { verify } from './webhooks.js';
 export { VERSION } from './version.js';
 
-export type { OperationInfo, Ligne, Donnees, Outcome, OptionsClient, OptionsTrain, OptionsEvaluate, OptionsBacktest, Engine, OptionsForecast, OptionsPredict, EngineFamily, Calibration, CalibrationBin, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
+export type { OperationInfo, Row, DataInput, Outcome, ClientOptions, TrainOptions, EvaluateOptions, BacktestOptions, Engine, ForecastOptions, PredictOptions, EngineFamily, Calibration, CalibrationBin, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';

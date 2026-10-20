@@ -51,17 +51,8 @@ export class SpavikDataError extends SpavikError {}
 export class SpavikTransportError extends SpavikError {}
 /** Missing, invalid, revoked or unauthorized API key. */
 export class SpavikAuthError extends SpavikError {}
-/** Insufficient credits for the requested operation. */
-export class SpavikCreditsExhausted extends SpavikError {
-  declare readonly balance: number | null;
-  declare readonly required: number | null;
-
-  constructor(message: string, options: ErrorOptions = {}) {
-    super(message, options);
-    this.balance = (this.payload.balance as number | undefined) ?? null;
-    this.required = (this.payload.required as number | undefined) ?? null;
-  }
-}
+/** Insufficient credits for the requested operation. `usage()` reports what is left. */
+export class SpavikCreditsExhausted extends SpavikError {}
 /** A plan limit has been reached. */
 export class SpavikQuotaExceeded extends SpavikError {}
 /** The API rejected the request data. */

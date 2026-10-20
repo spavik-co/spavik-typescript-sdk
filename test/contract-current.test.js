@@ -34,18 +34,18 @@ test('family defaults and diagnostics are owned by the API', async () => {
   const result = await model.predict({ x: 1 }, { engineVersion: 'presage-latest' });
   assert.deepEqual(calls.at(-1).body, { rows: [{ x: 1 }], engine_version: 'presage-latest' });
   assert.equal(result.requestId, 'req_current');
-  assert.equal(result.lignes[0].request_id, 'req_prediction_original');
+  assert.equal(result.predictions[0].request_id, 'req_prediction_original');
   assert.equal(result.engine, 'presage-2');
   assert.equal(result.version, 7);
-  assert.equal(result.cout, null);
-  assert.equal(result.solde, 80);
+  assert.equal(result.cost, null);
+  assert.equal(result.predictionsRemaining, 80);
   for (const method of ['forecast', 'backtest']) {
     const result = await client[method](rows, { target: 'y', horizon: 2, engineFamily: 'presage', engineVersion: 'presage-2', includeBacktestPredictions: true, ...(method === 'forecast' ? { backtest: true } : {}) });
     assert.deepEqual(calls.at(-1).body, { target: 'y', data: rows, horizon: 2, engine_family: 'presage', engine_version: 'presage-2', include_backtest_predictions: true, ...(method === 'forecast' ? { backtest: true } : {}) });
     assert.deepEqual(result.backtest.predictions, points);
   }
   assert.deepEqual((await client.evaluate(rows, { target: 'y', engineFamily: 'presage' })).trial.calibration, calibration);
-  assert.deepEqual((await model.performance()).donnees.training_calibration, calibration);
+  assert.deepEqual((await model.performance()).data.training_calibration, calibration);
   assert.equal((await client.engineFamilies())[0].is_default, true);
 });
 

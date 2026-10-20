@@ -1,4 +1,4 @@
-import type { Donnees, Outcome, Engine, OptionsTrain, OptionsForecast, OptionsEvaluate, OptionsBacktest, OptionsPredict, EngineFamily, Calibration, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
+import type { DataInput, Outcome, Engine, TrainOptions, ForecastOptions, EvaluateOptions, BacktestOptions, PredictOptions, EngineFamily, Calibration, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
 import type { ApiRecord, ModelData, Requete } from './internal.js';
 // Client Spavik : les sept operations du perimetre moteur.
 //
@@ -10,80 +10,74 @@ import { normaliser } from './data.js';
 import { Transport } from './http.js';
 import { SpavikConflict } from './errors.js';
 
-/** API response data, credit cost, remaining balance and request identifier. */
-export class Resultat {
-  declare readonly donnees: ApiRecord;
-  declare readonly cout: number | null;
-  declare readonly solde: number | null;
+/**
+ * API response data, credit cost and request identifier.
+ * `cost` is 0 for a free operation and null for a billed one: the API does not
+ * return the amount charged. `predictionsRemaining` copies the
+ * X-Spavik-Predictions-Remaining header (monthly allowance left plus balance),
+ * null when the API does not send it.
+ */
+export class Result {
+  declare readonly data: ApiRecord;
+  declare readonly cost: number | null;
+  declare readonly predictionsRemaining: number | null;
   declare readonly requestId: string | null;
-  constructor(donnees: ApiRecord | null, cout: number | null) {
-    this.donnees = donnees || {};
-    this.cout = cout;
-    this.solde = solde(this.donnees);
-    this.requestId = (this.donnees._request_id as string | null) ?? null;
+  constructor(data: ApiRecord | null, cost: number | null) {
+    this.data = data || {};
+    this.cost = cost;
+    // L'API ne met pas le reste dans le corps : seul l'en-tete, recopie par le transport, le donne.
+    this.predictionsRemaining = Number.isInteger(this.data._predictions_remaining)
+      ? this.data._predictions_remaining as number : null;
+    this.requestId = (this.data._request_id as string | null) ?? null;
   }
 
   /** Initial test-set diagnostic returned by the performance API. */
   get trainingCalibration(): Calibration | null {
-    return (this.donnees.training_calibration as Calibration | null) ?? null;
+    return (this.data.training_calibration as Calibration | null) ?? null;
   }
 
   /** Exact serving engine, distinct from the model data version. */
   get engine(): string | null {
-    return (this.donnees._engine_version ?? this.donnees.engine) as string | null ?? null;
+    return (this.data._engine_version ?? this.data.engine) as string | null ?? null;
   }
 
-  get<T = unknown>(cle: string, defaut?: T): T {
-    return (this.donnees[cle] ?? defaut) as T;
+  get<T = unknown>(key: string, fallback?: T): T {
+    return (this.data[key] ?? fallback) as T;
   }
 }
 
-export class Prediction extends Resultat {
-  get lignes() {
-    return (this.donnees.predictions as ApiRecord[]) || [];
+export class Prediction extends Result {
+  get predictions() {
+    return (this.data.predictions as ApiRecord[]) || [];
   }
 
   get version() {
-    return (this.donnees.version as number | null) ?? null;
+    return (this.data.version as number | null) ?? null;
   }
 }
 
 /**
  * Forecast result. Use `points()` to parse the rows, or `csv` for the raw CSV.
  */
-export class Prevision extends Resultat {
+export class Forecast extends Result {
   get csv() {
-    return (this.donnees.forecast_csv as string) || '';
+    return (this.data.forecast_csv as string) || '';
   }
 
   async points() {
-    if (!this.csv.trim()) return (this.donnees.forecast || this.donnees.predictions || []) as ApiRecord[];
+    if (!this.csv.trim()) return (this.data.forecast || this.data.predictions || []) as ApiRecord[];
     return normaliser(this.csv, 'forecast');
   }
 
   get backtest(): (ApiRecord & { predictions?: BacktestPrediction[] | null }) | null {
-    return (this.donnees.backtest as ApiRecord) ?? null;
+    return (this.data.backtest as ApiRecord) ?? null;
   }
 
-  get cible() { return (this.donnees.target as string | null) ?? null; }
+  get target() { return (this.data.target as string | null) ?? null; }
 
-  get horizon() { return (this.donnees.prediction_length as number | null) ?? null; }
+  get horizon() { return (this.data.prediction_length as number | null) ?? null; }
 
-  get series() { return (this.donnees.n_series as number | null) ?? null; }
-}
-
-function solde(brut: ApiRecord): number | null {
-  for (const cle of ['credits_remaining', 'balance', 'credit_balance', 'credits']) {
-    if (Number.isInteger(brut[cle])) return brut[cle] as number;
-  }
-  const facturation = brut.billing as ApiRecord | undefined;
-  if (facturation && typeof facturation === 'object') {
-    for (const cle of ['credits_remaining', 'balance', 'credit_balance']) {
-      if (Number.isInteger(facturation[cle])) return facturation[cle] as number;
-    }
-  }
-  // Sinon l'en-tete X-Spavik-Predictions-Remaining, recopie par le transport.
-  return Number.isInteger(brut._predictions_remaining) ? brut._predictions_remaining as number : null;
+  get series() { return (this.data.n_series as number | null) ?? null; }
 }
 
 // Requete interne, hors du contrat moteur genere.
@@ -133,10 +127,10 @@ export class Model {
     return Array.isArray(this._donnees.feature_columns) ? [...this._donnees.feature_columns] : [];
   }
 
-  get donnees() { return { ...this._donnees }; }
+  get data() { return { ...this._donnees }; }
 
   /** Score rows. Each row costs the serving engine's credit price. */
-  async predict(rows: Donnees, options: OptionsPredict = {}): Promise<Prediction> {
+  async predict(rows: DataInput, options: PredictOptions = {}): Promise<Prediction> {
     const plan = await ops.predict(this.id, rows, options);
     return new Prediction(await this._client._envoyer(plan.requete), null);
   }
@@ -147,19 +141,19 @@ export class Model {
   }
 
   /** Submit observed outcomes with features and actual on every plan. Free. */
-  async submitOutcomes(outcomes: Outcome | Outcome[] | string): Promise<Resultat> {
+  async submitOutcomes(outcomes: Outcome | Outcome[] | string): Promise<Result> {
     const plan = await ops.submitOutcomes(this.id, outcomes);
-    return new Resultat(await this._client._envoyer(plan.requete), 0);
+    return new Result(await this._client._envoyer(plan.requete), 0);
   }
 
   /**
    * Integrate pending outcomes into a new model version. Free.
    * Returns `null` only when there are no pending outcomes; other API failures are raised.
    */
-  async refresh(): Promise<Resultat | null> {
+  async refresh(): Promise<Result | null> {
     const plan = ops.refresh(this.id);
     try {
-      return new Resultat(await this._client._envoyer(plan.requete), 0);
+      return new Result(await this._client._envoyer(plan.requete), 0);
     } catch (exc) {
       if (refreshAbsorbe(exc)) return null;
       throw exc;
@@ -167,9 +161,9 @@ export class Model {
   }
 
   /** Observed performance and initial calibration. API failures are raised. */
-  async performance(days = 30): Promise<Resultat | null> {
+  async performance(days = 30): Promise<Result | null> {
     const plan = ops.performance(this.id, days);
-    return new Resultat(await this._client._envoyer(plan.requete), 0);
+    return new Result(await this._client._envoyer(plan.requete), 0);
   }
 
   async reload(): Promise<Model> {
@@ -207,7 +201,7 @@ export class Spavik extends Transport {
    * validation, hint, trial and assessment (status, metric, message), unchanged.
    * No fallback conclusion. Creates nothing, charges nothing.
    */
-  async evaluate(data: Donnees, options: OptionsEvaluate): Promise<EvaluationReport> {
+  async evaluate(data: DataInput, options: EvaluateOptions): Promise<EvaluationReport> {
     const plan = await ops.evaluate(data, options);
     const brut = await this._envoyer(plan.requete);
     return brut && typeof brut === 'object' ? { ...brut } : {};
@@ -218,7 +212,7 @@ export class Spavik extends Transport {
    * its history replayed against references. assessment is preserved unchanged.
    * No fallback conclusion, no forecast, no charge.
    */
-  async backtest(data: Donnees, options: OptionsBacktest): Promise<BacktestReport> {
+  async backtest(data: DataInput, options: BacktestOptions): Promise<BacktestReport> {
     const plan = await ops.backtest(data, options);
     const brut = await this._envoyer(plan.requete);
     return brut && typeof brut === 'object' ? { ...brut } : {};
@@ -239,7 +233,7 @@ export class Spavik extends Transport {
   }
 
   /** Create and train a model in one call. Free. */
-  async train(data: Donnees, options: OptionsTrain): Promise<Model> {
+  async train(data: DataInput, options: TrainOptions): Promise<Model> {
     // Les controles locaux d'abord : un refus prononce ici ne doit toucher ni
     // le reseau ni le catalogue des moteurs.
     const plan = await ops.train(data, options);
@@ -248,9 +242,9 @@ export class Spavik extends Transport {
   }
 
   /** Forecast time series. Billed by the API at horizon times the serving engine tariff, all series included. */
-  async forecast(data: Donnees, options: OptionsForecast): Promise<Prevision> {
+  async forecast(data: DataInput, options: ForecastOptions): Promise<Forecast> {
     const plan = await ops.forecast(data, options);
-    return new Prevision(await this._envoyer(plan.requete), plan.cout);
+    return new Forecast(await this._envoyer(plan.requete), plan.cout);
   }
 
   /**

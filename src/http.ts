@@ -1,6 +1,6 @@
 import { retryAllowed, retryDelay } from './retry.js';
 import { VERSION } from './version.js';
-import type { OptionsClient } from './types.js';
+import type { ClientOptions } from './types.js';
 import type { Requete } from './internal.js';
 import type { SpavikError } from './errors.js';
 // Transport.
@@ -47,12 +47,12 @@ function journalActif() {
 function tracer(requete: Requete, statut: number | null, duree: number, requestId: unknown, cleApi: string, tentative: number) {
   if (!journalActif()) return;
   const idem = (requete.idempotence || '-').slice(0, 8);
-  const reprise = tentative > 1 ? `  tentative ${tentative}` : '';
+  const reprise = tentative > 1 ? `  attempt ${tentative}` : '';
   // eslint-disable-next-line no-console
   console.error(
     `spavik ${requete.methode} ${requete.chemin}  idem=${idem}  `
-    + `${(duree / 1000).toFixed(2)}s  ${statut ?? 'reseau'}  ${requestId || '-'}${reprise}  `
-    + `cle=${masquer(cleApi)}`,
+    + `${(duree / 1000).toFixed(2)}s  ${statut ?? 'network'}  ${requestId || '-'}${reprise}  `
+    + `key=${masquer(cleApi)}`,
   );
 }
 
@@ -124,7 +124,7 @@ export class Transport {
   constructor({
     apiKey, baseUrl, userAgent, timeout = 30000, fetch: fetchImpl,
     maxRetries = REPRISES_MAX, backoff = attente,
-  }: OptionsClient = {}) {
+  }: ClientOptions = {}) {
     // Une chaine vide ne doit pas reprendre une cle de l'environnement.
     this.cleApi = apiKey ?? env('SPAVIK_API_KEY') ?? '';
     this.baseUrl = (baseUrl || BASE_URL_DEFAUT).replace(/\/+$/, '');

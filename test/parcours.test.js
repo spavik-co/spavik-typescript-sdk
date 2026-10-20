@@ -21,9 +21,9 @@ test('boucle complete', async () => {
 
   const depart = api.solde;
   const prediction = await modele.predict([{ plan: 'pro', seats: 12, tickets_90d: 3 }]);
-  assert.equal(prediction.cout, null);
-  assert.equal(prediction.solde, depart - 1);
-  assert.equal(prediction.lignes.length, 1);
+  assert.equal(prediction.cost, null);
+  assert.equal(prediction.predictionsRemaining, depart - 1);
+  assert.equal(prediction.predictions.length, 1);
   assert.ok(prediction.requestId);
 
   const verites = await modele.submitOutcomes([
@@ -32,7 +32,7 @@ test('boucle complete', async () => {
     { request_id: 'req_3', features: { plan: 'pro', seats: 12, tickets_90d: 3 }, actual: 1 },
   ]);
   assert.equal(verites.get('accepted'), 3);
-  assert.equal(verites.cout, 0);
+  assert.equal(verites.cost, 0);
 
   const integration = await modele.refresh();
   assert.ok(integration);
@@ -65,7 +65,7 @@ test('prevision et cout', async () => {
   const serie = Array.from({ length: 28 }, (_, i) => ({ date: `2026-07-${i + 1}`, ventes: 100 + i }));
   const depart = api.solde;
   const resultat = await client(api).forecast(serie, { target: 'ventes', horizon: 7 });
-  assert.equal(resultat.cout, null);
+  assert.equal(resultat.cost, null);
   assert.equal((await resultat.points()).length, 7);
   assert.equal(depart - api.solde, 7);
 });
@@ -78,7 +78,7 @@ test('appel multi-series coute seulement l horizon', async () => {
     Array.from({ length: 20 }, (_, i) => ({ boutique, ventes: i })));
   assert.equal(api.appels.length, 0);
   const result = await spavik.forecast(serie, { target: 'ventes', horizon: 7, itemId: 'boutique' });
-  assert.equal(result.cout, null);
+  assert.equal(result.cost, null);
   assert.equal(api.solde, 0);
 });
 
@@ -133,7 +133,7 @@ test('le solde vient de l en-tete quand le corps ne l a pas', async () => {
   const api = new ApiSimulee();
   const serie = Array.from({ length: 28 }, (_, i) => ({ date: `2026-07-${i + 1}`, ventes: 100 + i }));
   const r = await client(api).forecast(serie, { target: 'ventes', horizon: 3 });
-  assert.equal(r.solde, 97);
+  assert.equal(r.predictionsRemaining, 97);
   assert.equal(api.solde, 97);
 });
 
@@ -183,7 +183,7 @@ test('la reponse de prediction porte les request_id', async () => {
   const api = new ApiSimulee();
   const modele = await client(api).train(CHURN, { target: 'churn' });
   const r = await modele.predict(Array.from({ length: 3 }, () => ({ plan: 'pro' })));
-  assert.deepEqual(r.lignes.map((l) => l.request_id), ['req_p0000', 'req_p0001', 'req_p0002']);
+  assert.deepEqual(r.predictions.map((l) => l.request_id), ['req_p0000', 'req_p0001', 'req_p0002']);
 });
 
 test('prediction cost is not invented from the training engine tariff', async () => {
@@ -196,7 +196,7 @@ test('prediction cost is not invented from the training engine tariff', async ()
   api.modeles.get(modele.id).engine = 'big-v1'; // servi par un moteur a trois credits
   modele = await spavik.model(modele.id);
   assert.equal(modele.engine, 'big-v1');
-  assert.equal((await modele.predict(Array.from({ length: 4 }, () => ({ plan: 'pro' })))).cout, null);
+  assert.equal((await modele.predict(Array.from({ length: 4 }, () => ({ plan: 'pro' })))).cost, null);
   assert.equal(api.compte('/v1/engines'), 0, 'le catalogue se lit une fois');
 });
 

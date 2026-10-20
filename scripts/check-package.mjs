@@ -42,11 +42,11 @@ try {
     const body = '{"type":"model.trained"}';
     const stamp = Math.floor(Date.now() / 1000);
     const signature = 't=' + stamp + ',v1=' + createHmac('sha256', 'fixture').update(stamp + '.').update(body).digest('hex');
-    assert.equal((await webhook.verifier(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
-    await assert.rejects(webhook.verifier(body, {}, 'fixture'), sdk.SpavikSignatureError);
-    assert.equal(webhook.verifier, sdk.verifier);
+    assert.equal((await webhook.verify(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
+    await assert.rejects(webhook.verify(body, {}, 'fixture'), sdk.SpavikSignatureError);
+    assert.equal(webhook.verify, sdk.verify);
     delete globalThis.crypto;
-    assert.equal((await webhook.verifier(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
+    assert.equal((await webhook.verify(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
   `;
   await writeFile(join(consumer, 'esm.mjs'), `import * as rootModule from 'spavik';
 import * as webhookModule from 'spavik/webhooks';

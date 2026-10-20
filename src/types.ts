@@ -10,19 +10,19 @@ export interface OperationInfo {
 
 
 /** One data row: column names and scalar values. */
-export type Ligne = Record<string, string | number | boolean | null>;
+export type Row = Record<string, string | number | boolean | null>;
 
 /**
  * An array of rows, a single row, a CSV or JSON file path, or raw CSV/JSON text.
  */
-export type Donnees = Ligne[] | Ligne | string;
+export type DataInput = Row[] | Row | string;
 
 /**
  * An observed outcome with its full feature row, required on every plan.
  * The optional request ID is correlation metadata, never an archive lookup.
  */
 export type Outcome = {
-  features: Ligne;
+  features: Row;
   request_id?: string;
   actual: string | number | boolean;
   /** Original prediction for aggregate performance measurement; requires version and engine. */
@@ -38,7 +38,7 @@ export type Outcome = {
   | { prediction: string | number | boolean; version: number; engine: string }
 );
 
-export interface OptionsClient {
+export interface ClientOptions {
   /** API key, prefix `sk-spv-api-`. Defaults to `SPAVIK_API_KEY`. */
   apiKey?: string;
   /** Application User-Agent, e.g. "my-agent/1.0". Defaults to the SDK name/version. */
@@ -55,7 +55,7 @@ export interface OptionsClient {
   backoff?: (tentative: number) => number;
 }
 
-export interface OptionsTrain {
+export interface TrainOptions {
   /** Target column to predict. */
   target: string;
   engineFamily?: string;
@@ -64,13 +64,13 @@ export interface OptionsTrain {
   autoUpdate?: boolean;
 }
 
-export interface OptionsEvaluate {
+export interface EvaluateOptions {
   /** Target column to predict. */
   target: string;
   engineFamily?: string;
 }
 
-export interface OptionsBacktest {
+export interface BacktestOptions {
   engineFamily?: string;
   engineVersion?: string;
   includeBacktestPredictions?: boolean;
@@ -91,7 +91,7 @@ export interface EngineFamily {
   is_default: boolean;
 }
 
-export interface OptionsPredict {
+export interface PredictOptions {
   engineVersion?: string;
 }
 
@@ -110,7 +110,7 @@ export interface Engine {
   retires_at?: string | null;
 }
 
-export interface OptionsForecast {
+export interface ForecastOptions {
   engineFamily?: string;
   engineVersion?: string;
   backtest?: boolean;

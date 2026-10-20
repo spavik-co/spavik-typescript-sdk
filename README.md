@@ -55,14 +55,14 @@ const model = await client.train('churn.csv', { target: 'churn' });
 
 // Predict for a new customer using the same input columns. This consumes credits.
 const result = await model.predict({ plan: 'pro', seats: 12, tickets_90d: 2 });
-console.log(result.lignes);
+console.log(result.predictions);
 ```
 
 ```sh
 node quickstart.mjs
 ```
 
-`result.lignes` contains the predictions returned by the API. Reuse the trained
+`result.predictions` contains the predictions returned by the API. Reuse the trained
 model for subsequent predictions; you do not need to train for every request.
 
 ## What you can do

@@ -6,7 +6,7 @@
 
 import { SpavikSignatureError } from './errors.js';
 
-export const TOLERANCE_SECONDES = 300;
+export const TOLERANCE_SECONDS = 300;
 
 function entete(entetes: Headers | Record<string, string>, nom: string): string | null {
   if (entetes != null && 'get' in entetes && typeof entetes.get === 'function') {
@@ -51,11 +51,11 @@ function egalTempsConstant(a: string, b: string) {
  * The API sends `Spavik-Signature: t=<unix seconds>,v1=<hex>` and signs `<t>.` followed by the raw bytes.
  * Pass the raw request bytes; parsing and serializing the body changes its signature.
  */
-export async function verifier(corps: string | Uint8Array | ArrayBuffer, entetes: Headers | Record<string, string>, secret: string, { tolerance = TOLERANCE_SECONDES }: { tolerance?: number } = {}): Promise<Record<string, unknown>> {
+export async function verify(body: string | Uint8Array | ArrayBuffer, headers: Headers | Record<string, string>, secret: string, { tolerance = TOLERANCE_SECONDS }: { tolerance?: number } = {}): Promise<Record<string, unknown>> {
   const encodeur = new TextEncoder();
-  const octets = typeof corps === 'string' ? encodeur.encode(corps) : new Uint8Array(corps);
+  const octets = typeof body === 'string' ? encodeur.encode(body) : new Uint8Array(body);
 
-  const valeur = entete(entetes, 'Spavik-Signature');
+  const valeur = entete(headers, 'Spavik-Signature');
   if (!valeur) throw new SpavikSignatureError('no Spavik-Signature header on the request.');
   const { emis, fournies } = lireSignature(valeur);
 

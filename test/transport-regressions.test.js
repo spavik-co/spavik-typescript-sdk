@@ -45,7 +45,7 @@ test('an interrupted body retries once with the same mutation and returns the su
     return calls.length === 1 ? interrupted(new TypeError('terminated'))
       : Response.json({ predictions: [{ value: 1 }] });
   });
-  assert.equal((await model.predict({ x: 1 })).lignes[0].value, 1);
+  assert.equal((await model.predict({ x: 1 })).predictions[0].value, 1);
   assert.equal(calls.length, 2);
   assert.equal(calls[0].headers['Idempotency-Key'], calls[1].headers['Idempotency-Key']);
   assert.equal(calls[0].body, calls[1].body);

@@ -32,15 +32,15 @@ test('le requestId remonte dans l exception', async () => {
   });
 });
 
-test('credits epuises porte le solde', async () => {
+test('credits epuises porte le code de l API, rien d autre', async () => {
   const api = new ApiSimulee();
   const modele = await client(api).train(CHURN, { target: 'churn' });
   api.solde = 2;
   const rows = Array.from({ length: 5 }, () => ({ plan: 'pro' }));
   await assert.rejects(() => modele.predict(rows), (exc) => {
     assert.ok(exc instanceof SpavikCreditsExhausted);
-    assert.equal(exc.balance, 2);
-    assert.equal(exc.required, 5);
+    assert.equal(exc.code, 'CREDITS_EXHAUSTED');
+    assert.equal('balance' in exc, false);
     return true;
   });
 });
@@ -115,7 +115,7 @@ test('une prediction rejouee ne debite pas deux fois', async () => {
   const depart = api.solde;
   api.repondra(`/v1/models/${modele.id}/predict`, erreur(503, 'ENGINE_UNAVAILABLE'));
   const resultat = await modele.predict(Array.from({ length: 4 }, () => ({ plan: 'pro' })));
-  assert.equal(resultat.cout, null);
+  assert.equal(resultat.cost, null);
   assert.equal(depart - api.solde, 4);
 });
 
