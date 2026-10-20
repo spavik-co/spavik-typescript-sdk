@@ -27,6 +27,11 @@ test('csv : les nombres redeviennent des nombres', async () => {
   assert.deepEqual(await normaliser('a,b,c\n1,2.5,texte\n'), [{ a: 1, b: 2.5, c: 'texte' }]);
 });
 
+test('csv : les codes gardent leurs zeros', async () => {
+  assert.deepEqual(await normaliser('code,n,x,z,d\n007,0,1_000,-0.5,.25\n'),
+    [{ code: '007', n: 0, x: '1_000', z: -0.5, d: 0.25 }]);
+});
+
 test('csv point-virgule', async () => {
   assert.deepEqual(await normaliser('a;b\n1;2\n'), [{ a: 1, b: 2 }]);
 });

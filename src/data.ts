@@ -11,13 +11,14 @@ const EXTENSIONS_CSV = ['.csv', '.tsv', '.txt'];
 
 function typer(valeur: string) {
   // Un CSV ne porte que du texte. Les nombres redeviennent des nombres.
+  // Un zero en tete ("007", un code postal) reste du texte.
   const brut = valeur.trim();
   if (brut === '') return null;
-  if (/^-?\d+$/.test(brut)) {
+  if (/^-?(0|[1-9]\d*)$/.test(brut)) {
     const nombre = Number(brut);
     return Number.isSafeInteger(nombre) ? nombre : valeur;
   }
-  if (/^-?\d*\.\d+(e-?\d+)?$/i.test(brut)) {
+  if (/^-?(0|[1-9]\d*)?\.\d+(e[-+]?\d+)?$/i.test(brut)) {
     const nombre = Number(brut);
     return Number.isFinite(nombre) && Math.abs(nombre) <= Number.MAX_SAFE_INTEGER ? nombre : valeur;
   }
