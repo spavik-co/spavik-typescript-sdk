@@ -20,7 +20,6 @@ function env(nom: string) {
   return globalThis.process?.env?.[nom] ?? undefined;
 }
 
-export const BASE_URL_TEST = 'https://test-api.spavik.co';
 export const BASE_URL_DEFAUT = env('SPAVIK_BASE_URL') || 'https://api.spavik.co';
 
 export function nouvelleCleIdempotence() {

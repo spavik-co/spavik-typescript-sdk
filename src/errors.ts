@@ -7,7 +7,7 @@
 // Les noms sont ceux de la bibliotheque Python, a la lettre. La suite de
 // conformite le verifie.
 
-import { FAMILLE_PAR_CODE } from './contract.js';
+import { ERROR_FAMILY_BY_CODE } from './contract.js';
 
 // Un code machine de l'API est en majuscules avec des soulignes. La passerelle,
 // elle, rend ses propres erreurs sous une autre forme :
@@ -99,7 +99,7 @@ const PAR_STATUT: Record<number, typeof SpavikError> = {
 
 function classe(code: string | null, status: number | null) {
   if (code) {
-    const famille = FAMILLE_PAR_CODE[code];
+    const famille = ERROR_FAMILY_BY_CODE[code];
     if (famille && famille !== 'hors_perimetre') return PAR_FAMILLE[famille];
   }
   if (status != null) {

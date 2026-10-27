@@ -2,7 +2,7 @@
 import type { OperationInfo } from './types.js';
 
 export const API_VERSION = "1.0.0";
-export const CONTRAT_SOURCE = "https://test-api.spavik.co";
+export const CONTRACT_SOURCE = "https://api.spavik.co";
 export const OPERATIONS: Record<"train" | "predict" | "forecast" | "submit_outcomes" | "refresh" | "list_models" | "performance", OperationInfo> = {
   "train": {
     "method": "POST",
@@ -68,7 +68,7 @@ export const OPERATIONS: Record<"train" | "predict" | "forecast" | "submit_outco
     "idempotency_declared_in_contract": false
   }
 };
-export const FAMILLE_PAR_CODE: Record<string, string> = {
+export const ERROR_FAMILY_BY_CODE: Record<string, string> = {
   "ACCOUNT_NOT_FOUND": "not_found",
   "ADMIN_KEY_CANNOT_PREDICT": "auth",
   "API_KEY_EXPIRED": "auth",

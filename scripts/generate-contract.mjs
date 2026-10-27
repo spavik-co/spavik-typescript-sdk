@@ -8,9 +8,9 @@ const output = `// Genere par scripts/generate-contract.mjs ; ne pas modifier di
 import type { OperationInfo } from './types.js';
 
 export const API_VERSION = ${literal(data.API_VERSION)};
-export const CONTRAT_SOURCE = ${literal(data.CONTRAT_SOURCE)};
+export const CONTRACT_SOURCE = ${literal(data.CONTRACT_SOURCE)};
 export const OPERATIONS: Record<${names}, OperationInfo> = ${literal(data.OPERATIONS)};
-export const FAMILLE_PAR_CODE: Record<string, string> = ${literal(data.FAMILLE_PAR_CODE)};
+export const ERROR_FAMILY_BY_CODE: Record<string, string> = ${literal(data.ERROR_FAMILY_BY_CODE)};
 export const KEY_PREFIXES = ${literal(data.KEY_PREFIXES)};
 `;
 const target = new URL('src/contract.ts', root);
