@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.1
+
+First pre-release on npm: `npm install spavik@next`.
+
 
 - Keep CSV values with a leading zero, such as `007` or a postal code, as text
   instead of turning them into numbers. Only plain decimal notation becomes a
