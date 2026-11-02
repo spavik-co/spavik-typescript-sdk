@@ -11,10 +11,10 @@ Add predictive capabilities to your application without building an ML stack.
 
 Requires Node.js 22 or later; works with TypeScript and JavaScript.
 
-Development preview, published as a pre-release under the `next` tag:
+Early release: the API may change before 1.0.
 
 ```sh
-npm install spavik@next
+npm install spavik
 ```
 
 ## Get your API key
