@@ -31,4 +31,4 @@ export {
 export { verify } from './webhooks.js';
 export { VERSION } from './version.js';
 
-export type { OperationInfo, Row, DataInput, Outcome, ClientOptions, TrainOptions, EvaluateOptions, BacktestOptions, Engine, ForecastOptions, PredictOptions, EngineFamily, Calibration, CalibrationBin, BacktestPrediction, EvaluationReport, BacktestReport } from './types.js';
+export type { OperationInfo, Row, DataInput, Outcome, ClientOptions, TrainOptions, EvaluateOptions, BacktestOptions, Engine, ForecastOptions, PredictOptions, EngineFamily, Calibration, CalibrationBin, BacktestPrediction, EvaluationReport, BacktestReport, FeatureImportance } from './types.js';

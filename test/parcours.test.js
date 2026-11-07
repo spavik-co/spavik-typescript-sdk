@@ -170,6 +170,16 @@ test('evaluer avant d entrainer', async () => {
   assert.match(rate.hint, /missing/);
 });
 
+test('l importance des colonnes se demande a l evaluation, pas a l entrainement', async () => {
+  const api = new ApiSimulee();
+  const spavik = client(api);
+  await spavik.evaluate(CHURN, { target: 'churn', explain: true });
+  assert.equal(api.appels.at(-1).corps.explain, true);
+  await spavik.train(CHURN, { target: 'churn', explain: true });
+  const entrainement = api.appels.find((a) => a.chemin === '/v1/models' && a.methode === 'POST');
+  assert.equal('explain' in entrainement.corps, false);
+});
+
 test('backtester une serie', async () => {
   const api = new ApiSimulee();
   const serie = Array.from({ length: 28 }, (_, i) => ({ date: `2026-07-${i + 1}`, ventes: 100 + i }));

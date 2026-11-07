@@ -60,7 +60,6 @@ export interface TrainOptions {
   target: string;
   engineFamily?: string;
   name?: string;
-  explain?: boolean;
   autoUpdate?: boolean;
 }
 
@@ -68,6 +67,14 @@ export interface EvaluateOptions {
   /** Target column to predict. */
   target: string;
   engineFamily?: string;
+  /** Also rank every feature column in trial.feature_importance. Slower on wide tables. */
+  explain?: boolean;
+}
+
+/** One feature column and the drop in trial score when its values are shuffled. */
+export interface FeatureImportance {
+  feature: string;
+  importance: number;
 }
 
 export interface BacktestOptions {
@@ -157,7 +164,7 @@ export interface BacktestPrediction {
   quantiles: Record<string, number>;
 }
 export interface EvaluationReport extends Record<string, unknown> {
-  trial?: (Record<string, unknown> & { calibration?: Calibration | null }) | null;
+  trial?: (Record<string, unknown> & { calibration?: Calibration | null; feature_importance?: FeatureImportance[] | null }) | null;
 }
 export interface BacktestReport extends Record<string, unknown> {
   backtest?: (Record<string, unknown> & { predictions?: BacktestPrediction[] | null }) | null;

@@ -20,7 +20,7 @@ function sansVides<T extends Record<string, unknown>>(objet: T): Partial<T> {
 
 export async function train(data: DataInput, options: TrainOptions = {} as TrainOptions) {
   if ('engine' in options) throw new SpavikDataError('Use engineFamily when creating a model; engineVersion is selected at prediction time.');
-  const { target, engineFamily, name, explain, autoUpdate } = options;
+  const { target, engineFamily, name, autoUpdate } = options;
   const lignes = await normaliser(data, 'training data');
   valider.entrainement(lignes, target);
   return {
@@ -29,7 +29,7 @@ export async function train(data: DataInput, options: TrainOptions = {} as Train
       methode: 'POST',
       chemin: '/v1/models',
       operation: 'train',
-      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily, name, explain, auto_update: autoUpdate }) },
+      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily, name, auto_update: autoUpdate }) },
       delai: delai('train'),
       idempotence: nouvelleCleIdempotence(),
       contexte: 'training',
@@ -141,7 +141,7 @@ export function listModels(limit: number, offset: number, status?: 'archived') {
 /** Le rapport de validation et un essai du moteur, sans rien creer ni debiter. L'API juge. */
 export async function evaluate(data: DataInput, options: EvaluateOptions = {} as EvaluateOptions) {
   if ('engine' in options) throw new SpavikDataError('Use engineFamily when evaluating data.');
-  const { target, engineFamily } = options;
+  const { target, engineFamily, explain } = options;
   const lignes = await normaliser(data, 'data to evaluate');
   return {
     cout: 0,
@@ -149,7 +149,7 @@ export async function evaluate(data: DataInput, options: EvaluateOptions = {} as
       methode: 'POST',
       chemin: '/v1/datasets/evaluate',
       operation: 'evaluate',
-      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily }) },
+      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily, explain }) },
       delai: delai('train'),
       contexte: 'data evaluation',
     },
