@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.2
 
 - Breaking: `train()` no longer sends `explain`. Feature importance moves to
   `evaluate(data, { target, explain: true })`, which ranks every feature
