@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Spavik } from '../dist/esm/index.js';
 import { retryDelay } from '../dist/esm/retry.js';
-const rows = Array.from({ length: 12 }, (_, x) => ({ x, y: x % 2 }));
+const rows = Array.from({ length: 120 }, (_, x) => ({ x, y: x % 2 }));
 const calibration = { available: false, unavailable_reason: 'missing_probabilities', per_class: [] };
 const points = [{ series: 'a', window: 0, actual: 3, prediction: 2, naive_prediction: 1, constant_prediction: 1, timestamp: '2026-10-01', quantiles: {} }];
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -44,7 +44,7 @@ test('family defaults and diagnostics are owned by the API', async () => {
     assert.deepEqual(calls.at(-1).body, { target: 'y', data: rows, horizon: 2, engine_family: 'presage', engine_version: 'presage-2', include_backtest_predictions: true, ...(method === 'forecast' ? { backtest: true } : {}) });
     assert.deepEqual(result.backtest.predictions, points);
   }
-  assert.deepEqual((await client.evaluate(rows, { target: 'y', engineFamily: 'presage' })).trial.calibration, calibration);
+  assert.deepEqual((await client.evaluate(rows, { target: 'y' })).trial.calibration, calibration);
   assert.deepEqual((await model.performance()).data.training_calibration, calibration);
   assert.equal((await client.engineFamilies())[0].is_default, true);
 });
@@ -72,7 +72,7 @@ for (const code of ['REQUEST_INTERRUPTED', 'IDEMPOTENCY_RESPONSE_UNAVAILABLE']) 
 
 test('REQUEST_IN_PROGRESS retries with the original key and body', async () => {
   const calls = [];
-  const client = new Spavik({ fetch: async (url, options) => {
+  const client = new Spavik({ apiKey: 'fixture', fetch: async (url, options) => {
     calls.push(options);
     return calls.length === 1 ? json({ message: 'REQUEST_IN_PROGRESS' }, 409, { 'Retry-After': '0' }) : json({ model: { id: 'mdl_test' } });
   } });

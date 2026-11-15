@@ -11,14 +11,13 @@ function client(api) {
   return new Spavik({ apiKey: CLE, baseUrl: 'http://api.test', fetch: api.fetch });
 }
 
-test('moins de dix lignes : refus sans appel', async () => {
+test('moins de cent lignes : refus sans appel', async () => {
   const api = new ApiSimulee();
   await assert.rejects(
     () => client(api).train(CHURN.slice(0, 8), { target: 'churn' }),
     (exc) => {
       assert.ok(exc instanceof SpavikDataError);
-      assert.match(exc.message, /at least 10 rows/);
-      assert.match(exc.message, /8 provided/);
+      assert.equal(exc.message, 'training needs at least 100 rows, 8 provided. Nothing was sent.');
       return true;
     },
   );

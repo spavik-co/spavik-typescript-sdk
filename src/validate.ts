@@ -7,7 +7,46 @@ import type { ApiRecord } from './internal.js';
 import { colonnes } from './data.js';
 import { SpavikDataError } from './errors.js';
 
-export const MIN_LIGNES_ENTRAINEMENT = 10;
+export const MIN_LIGNES_ENTRAINEMENT = 100;
+
+/**
+ * Refuse une option inconnue au lieu de l'ignorer : `explain` passe a `train`
+ * ne doit pas disparaitre en silence. Le JavaScript ne verifie rien de lui-meme.
+ */
+export function verifierOptions(quoi: string, options: unknown, permises: readonly string[]) {
+  if (options == null) return;
+  if (typeof options !== 'object' || Array.isArray(options)) {
+    throw new SpavikDataError(
+      `${quoi}: options must be an object, such as { target: 'churn' }, got ${Array.isArray(options) ? 'an array' : typeof options}. Nothing was sent.`,
+    );
+  }
+  const inconnues = Object.keys(options).filter((cle) => !permises.includes(cle));
+  if (inconnues.length) {
+    const liste = inconnues.map((cle) => `'${cle}'`).join(', ');
+    throw new SpavikDataError(
+      `${quoi}: unknown option${inconnues.length > 1 ? 's' : ''} ${liste}.`
+      + `${suggestion(inconnues[0], [...permises])} Accepted options: ${permises.join(', ')}. Nothing was sent.`,
+    );
+  }
+}
+
+/** La cible est la seule option sans laquelle rien n'a de sens. */
+export function cibleRequise(quoi: string, cible: unknown): asserts cible is string {
+  if (typeof cible !== 'string' || !cible.trim()) {
+    throw new SpavikDataError(
+      `${quoi}: the target option is required, the column to predict, such as { target: 'churn' }. Nothing was sent.`,
+    );
+  }
+}
+
+/** Une cle d'idempotence fournie par l'appelant part telle quelle, a chaque tentative. */
+export function cleIdempotence(cle: unknown): string | undefined {
+  if (cle === undefined) return undefined;
+  if (typeof cle !== 'string' || !cle || cle.length > 255) {
+    throw new SpavikDataError('idempotencyKey must be a non-empty string of at most 255 characters. Nothing was sent.');
+  }
+  return cle;
+}
 
 // Similarite au sens de difflib.SequenceMatcher, l'outil que la bibliotheque
 // Python utilise pour ses suggestions. Une distance d'edition ordinaire donne
@@ -122,16 +161,33 @@ export function prediction(lignes: ApiRecord[]) {
   if (!lignes.length) throw new SpavikDataError('no rows to score. Nothing was sent.');
 }
 
-export function previsions(lignes: ApiRecord[], cible: string, horizon: number, timestamp?: string) {
+export function previsions(lignes: ApiRecord[], cible: string, horizon: number, timestamp?: string, itemId?: string) {
   if (!Number.isInteger(horizon) || horizon < 1) {
     throw new SpavikDataError(`the horizon must be at least 1, got ${horizon}.`);
   }
   colonnePresente(lignes, cible, 'target');
   if (timestamp) colonnePresente(lignes, timestamp, 'timestamp');
+  if (itemId) colonnePresente(lignes, itemId, 'item_id');
 
   // Une serie plus courte que son propre horizon est le cas qui a fait echouer
   // l'exemple publie de l'API : trois points pour un horizon de quatorze.
-  if (lignes.length < horizon) {
+  // Avec plusieurs series, c'est chacune qui compte, pas le total.
+  if (itemId) {
+    const tailles = new Map<string, number>();
+    for (const ligne of lignes) {
+      const serie = String(ligne[itemId] ?? '');
+      tailles.set(serie, (tailles.get(serie) ?? 0) + 1);
+    }
+    for (const [serie, taille] of tailles) {
+      if (taille < horizon) {
+        throw new SpavikDataError(
+          `the series '${serie}' has ${taille} point(s) for a horizon of ${horizon}. `
+          + 'A series shorter than its horizon yields nothing usable: '
+          + `provide at least ${horizon} points per series, preferably several times more.`,
+        );
+      }
+    }
+  } else if (lignes.length < horizon) {
     throw new SpavikDataError(
       `the series has ${lignes.length} point(s) for a horizon of ${horizon}. `
       + 'A series shorter than its horizon yields nothing usable: '

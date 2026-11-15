@@ -136,6 +136,7 @@ export const ERROR_FAMILY_BY_CODE: Record<string, string> = {
   "TARGET_TASK_FROZEN": "validation",
   "TIMESTAMP_COLUMN_MISSING": "validation",
   "TIMESTAMP_COLUMN_NOT_FOUND": "validation",
+  "TOKEN_INVALID": "auth",
   "TOO_MANY_COLUMNS": "quota",
   "TOO_MANY_REQUESTS": "rate_limit",
   "TOO_MANY_ROWS": "quota",

@@ -45,8 +45,10 @@ try {
     assert.equal((await webhook.verify(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
     await assert.rejects(webhook.verify(body, {}, 'fixture'), sdk.SpavikSignatureError);
     assert.equal(webhook.verify, sdk.verify);
+    // Sans WebCrypto global, une erreur nommee : aucun repli vers node:crypto,
+    // qui casserait le bundling pour navigateur.
     delete globalThis.crypto;
-    assert.equal((await webhook.verify(body, {'Spavik-Signature':signature}, 'fixture')).type, 'model.trained');
+    await assert.rejects(webhook.verify(body, {'Spavik-Signature':signature}, 'fixture'), error => error instanceof sdk.SpavikError && /WebCrypto/.test(error.message));
   `;
   await writeFile(join(consumer, 'esm.mjs'), `import * as rootModule from 'spavik';
 import * as webhookModule from 'spavik/webhooks';

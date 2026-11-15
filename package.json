@@ -1,6 +1,6 @@
 {
   "name": "spavik",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "JavaScript and TypeScript client for the Spavik API: training, prediction, forecasting, feedback loop.",
   "type": "module",
   "license": "Apache-2.0",
@@ -44,11 +44,11 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "npm run build && node scripts/test.mjs",
-    "types:check": "tsc --noEmit",
+    "types:check": "tsc --noEmit && tsc -p tsconfig.check.json",
     "prepack": "npm run build",
     "prepublishOnly": "npm run check",
     "test:package": "npm run build && node scripts/check-package.mjs",
-    "check": "npm run contract:check && npm test && node scripts/check-package.mjs",
+    "check": "npm run contract:check && npm run types:check && npm test && node scripts/check-package.mjs",
     "contract": "node scripts/generate-contract.mjs",
     "contract:check": "node scripts/generate-contract.mjs --check",
     "audit": "npm audit --audit-level=low"

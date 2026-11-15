@@ -3,6 +3,7 @@ import {
   API_VERSION, VERSION, OPERATIONS, verify,
   type DataInput, type Row, type Outcome, type ClientOptions, type TrainOptions,
   type EvaluateOptions, type BacktestOptions, type ForecastOptions, type Engine, type OperationInfo, type Calibration, type BacktestPrediction, type EngineFamily,
+  type Assessment, type PerformanceReport, type RefreshResult, type Usage, type PredictionRow, type WebhookHeaders,
 } from 'spavik';
 import { verify as webhookVerifier } from 'spavik/webhooks';
 
@@ -113,6 +114,50 @@ async function workflow(): Promise<void> {
   }
   // @ts-expect-error La cible est obligatoire.
   await client.train(data, {});
+
+  // Les exemples de la documentation, en mode strict.
+  const evaluation = await client.evaluate(data, { target: 'target', task: 'classification', maxSamples: 500, explain: true });
+  const status: Assessment['status'] = evaluation.assessment.status;
+  const metric: 'AUC' | 'MAE' | 'MASE' = evaluation.assessment.metric;
+  const evaluationId: string | null = evaluation.requestId;
+  const issues: string[] = evaluation.validation.issues.map((issue) => issue.code);
+  // @ts-expect-error The API picks the engine of the trial run.
+  const evaluateWithFamily: EvaluateOptions = { target: 'target', engineFamily: 'presage' };
+  const scored = await model.predict([{ plan: 'pro', seats: 12 }], { idempotencyKey: 'replay-me' });
+  const rows: PredictionRow[] = scored.predictions;
+  const feedback: Outcome[] = rows.map((p) => ({ request_id: p.request_id, features: { plan: 'pro', seats: 12 }, actual: true }));
+  await model.submitOutcomes(feedback, { idempotencyKey: 'outcomes-1' });
+  const strictPerformance: Result<PerformanceReport> = await model.performance();
+  const observed = strictPerformance.get('observed');
+  const observedStatus: Assessment['status'] | undefined = observed?.assessment?.status;
+  const observedValue: number | null | undefined = observed?.value;
+  const refreshedStrict: Result<RefreshResult> | null = await model.refresh({ idempotencyKey: 'refresh-1' });
+  const newVersion: number | undefined = refreshedStrict?.get('version').version;
+  const servedBy: string | null = scored.engineVersion;
+  const account: Usage = await client.usage();
+  const left: number = account.credit_balance;
+  const allowance: number | null = account.included_units_per_month;
+  const usageId: string | null = (await client.usage()).requestId;
+  const target: string | null | undefined = model.data.target;
+  const restored: Model = await model.restore();
+  const restoredById: Model = await client.restore(id);
+  await client.train(data, { target: 'target', idempotencyKey: 'train-1' });
+  await client.forecast(data, { ...forecast, idempotencyKey: 'forecast-1' });
+
+  // Les donnees typees de l'appelant : interfaces, tableaux en lecture seule, Date, champs optionnels.
+  interface Customer { plan: string; seats?: number; signed_up: Date; churn: boolean }
+  const customers: Customer[] = [{ plan: 'pro', signed_up: new Date(), churn: false }];
+  await client.train(customers, { target: 'churn' });
+  const frozen: readonly Customer[] = customers;
+  await client.evaluate(frozen, { target: 'churn' });
+  const readonlyRows: readonly Row[] = [{ x: 1, when: new Date(), maybe: undefined }];
+  await model.predict(readonlyRows);
+  await model.predict({ x: 1, when: new Date(), maybe: undefined });
+
+  // Des en-tetes a la forme de IncomingHttpHeaders (Express req.headers).
+  const incoming: { [name: string]: string | string[] | undefined; 'set-cookie'?: string[]; host?: string } = { host: 'example.invalid' };
+  await verify('{}', incoming, 'fixture');
+  const asHeaders: WebhookHeaders = incoming;
   // @ts-expect-error L'horizon doit etre numerique.
   await client.forecast(data, { target: 'target', horizon: '2' });
   // @ts-expect-error L'horizon peut etre absent de la reponse.

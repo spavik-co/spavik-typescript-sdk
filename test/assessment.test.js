@@ -7,11 +7,15 @@ for (const method of ['evaluate', 'backtest']) {
     test(`${method} preserves REST assessment ${status}`, async () => {
       const payload = { validation: { status: 'passed' }, trial: null };
       if (status !== null) payload.assessment = { status, metric: method === 'evaluate' ? 'AUC' : 'MASE', message: 'Exact API message' };
-      const client = new Spavik({ apiKey: '', fetch: async (url) => {
+      const client = new Spavik({ apiKey: 'fixture', fetch: async (url) => {
         assert.equal(new URL(url).pathname, method === 'evaluate' ? '/v1/datasets/evaluate' : '/v1/forecast/backtest');
         return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
       }});
-      assert.deepEqual(await client[method]([{ x: 1, y: 2 }], { target: 'y' }), { ...payload, _request_id: null });
+      const report = await client[method]([{ x: 1, y: 2 }], { target: 'y' });
+      // Le corps de l'API, tel quel : aucune cle interne ajoutee.
+      assert.deepEqual(report, payload);
+      assert.equal(report.requestId, null);
+      assert.equal(Object.keys(report).some((cle) => cle.startsWith('_')), false);
     });
   }
 }

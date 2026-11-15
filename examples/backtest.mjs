@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { Spavik } from '../dist/esm/index.js';
+import { Spavik } from 'spavik';
 
 if (process.argv.includes('--help')) {
   console.log('Usage: node examples/backtest.mjs [csv-path]');

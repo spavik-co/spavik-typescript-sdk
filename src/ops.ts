@@ -1,4 +1,7 @@
-import type { DataInput, Outcome, TrainOptions, ForecastOptions, EvaluateOptions, BacktestOptions, PredictOptions } from './types.js';
+import type {
+  DataInput, Outcome, TrainOptions, ForecastOptions, EvaluateOptions, BacktestOptions, PredictOptions,
+  SubmitOutcomesOptions, RefreshOptions,
+} from './types.js';
 // Les sept operations, decrites une seule fois.
 //
 // Chaque fonction fait tout ce qui ne demande pas le reseau : normaliser les
@@ -12,6 +15,24 @@ import { SpavikDataError } from './errors.js';
 
 const delai = (nom: keyof typeof OPERATIONS) => OPERATIONS[nom].timeout * 1000;
 
+// Un identifiant de modele ne doit jamais changer de route : '../usage' reste
+// un identifiant, encode, et non un chemin.
+const id = (modelId: string) => encodeURIComponent(String(modelId));
+
+const OPTIONS = {
+  train: ['target', 'engineFamily', 'name', 'autoUpdate', 'idempotencyKey'],
+  forecast: ['target', 'horizon', 'timestamp', 'quantiles', 'itemId', 'pointEstimate', 'engineFamily', 'engineVersion', 'backtest', 'includeBacktestPredictions', 'idempotencyKey'],
+  predict: ['engineVersion', 'idempotencyKey'],
+  submitOutcomes: ['idempotencyKey'],
+  refresh: ['idempotencyKey'],
+  evaluate: ['target', 'task', 'maxSamples', 'explain'],
+  backtest: ['target', 'horizon', 'timestamp', 'itemId', 'quantiles', 'pointEstimate', 'engineFamily', 'engineVersion', 'includeBacktestPredictions'],
+  models: ['limit', 'status'],
+} as const;
+
+/** Taille de page maximale acceptee par GET /v1/models. */
+export const PAGE_MAX = 200;
+
 function sansVides<T extends Record<string, unknown>>(objet: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(objet).filter(([, v]) => v !== undefined && v !== null),
@@ -19,8 +40,10 @@ function sansVides<T extends Record<string, unknown>>(objet: T): Partial<T> {
 }
 
 export async function train(data: DataInput, options: TrainOptions = {} as TrainOptions) {
-  if ('engine' in options) throw new SpavikDataError('Use engineFamily when creating a model; engineVersion is selected at prediction time.');
-  const { target, engineFamily, name, autoUpdate } = options;
+  valider.verifierOptions('train', options, OPTIONS.train);
+  const { target, engineFamily, name, autoUpdate, idempotencyKey } = options ?? {} as TrainOptions;
+  valider.cibleRequise('train', target);
+  const cle = valider.cleIdempotence(idempotencyKey);
   const lignes = await normaliser(data, 'training data');
   valider.entrainement(lignes, target);
   return {
@@ -31,17 +54,21 @@ export async function train(data: DataInput, options: TrainOptions = {} as Train
       operation: 'train',
       corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily, name, auto_update: autoUpdate }) },
       delai: delai('train'),
-      idempotence: nouvelleCleIdempotence(),
+      idempotence: cle ?? nouvelleCleIdempotence(),
       contexte: 'training',
     },
   };
 }
 
-export async function forecast(data: DataInput, {
-  target, horizon, timestamp, quantiles, itemId, pointEstimate, engineFamily, engineVersion, backtest, includeBacktestPredictions,
-}: ForecastOptions = {} as ForecastOptions) {
+export async function forecast(data: DataInput, options: ForecastOptions = {} as ForecastOptions) {
+  valider.verifierOptions('forecast', options, OPTIONS.forecast);
+  const {
+    target, horizon, timestamp, quantiles, itemId, pointEstimate, engineFamily, engineVersion, backtest, includeBacktestPredictions, idempotencyKey,
+  } = options ?? {} as ForecastOptions;
+  valider.cibleRequise('forecast', target);
+  const cle = valider.cleIdempotence(idempotencyKey);
   const lignes = await normaliser(data, 'series to forecast');
-  valider.previsions(lignes, target, horizon, timestamp);
+  valider.previsions(lignes, target, horizon, timestamp, itemId);
   return {
     cout: null,
     requete: {
@@ -55,56 +82,63 @@ export async function forecast(data: DataInput, {
         ...sansVides({ timestamp, quantiles, item_id: itemId, point_estimate: pointEstimate, engine_family: engineFamily, engine_version: engineVersion, backtest, include_backtest_predictions: includeBacktestPredictions }),
       },
       delai: delai('forecast'),
-      idempotence: nouvelleCleIdempotence(),
+      idempotence: cle ?? nouvelleCleIdempotence(),
       contexte: 'forecast',
     },
   };
 }
 
-export async function predict(modelId: string, rows: DataInput, { engineVersion }: PredictOptions = {}) {
+export async function predict(modelId: string, rows: DataInput, options: PredictOptions = {}) {
+  valider.verifierOptions('predict', options, OPTIONS.predict);
+  const { engineVersion, idempotencyKey } = options ?? {};
+  const cle = valider.cleIdempotence(idempotencyKey);
   const lignes = await normaliser(rows, 'rows to score');
   valider.prediction(lignes);
   return {
     cout: null,
     requete: {
       methode: 'POST',
-      chemin: `/v1/models/${modelId}/predict`,
+      chemin: `/v1/models/${id(modelId)}/predict`,
       operation: 'predict',
       corps: { rows: lignes, ...sansVides({ engine_version: engineVersion }) },
       delai: delai('predict'),
-      // Preserve the same key and body throughout retries.
-      idempotence: nouvelleCleIdempotence(),
+      // Meme cle et meme corps a chaque tentative.
+      idempotence: cle ?? nouvelleCleIdempotence(),
       contexte: 'prediction',
     },
   };
 }
 
-export async function submitOutcomes(modelId: string, outcomes: Outcome | Outcome[] | string) {
+export async function submitOutcomes(modelId: string, outcomes: Outcome | readonly Outcome[] | string, options: SubmitOutcomesOptions = {}) {
+  valider.verifierOptions('submitOutcomes', options, OPTIONS.submitOutcomes);
+  const cle = valider.cleIdempotence(options?.idempotencyKey);
   const lignes = await normaliser(outcomes, 'outcomes');
   valider.verites(lignes);
   return {
     cout: 0,
     requete: {
       methode: 'POST',
-      chemin: `/v1/models/${modelId}/outcomes`,
+      chemin: `/v1/models/${id(modelId)}/outcomes`,
       operation: 'submit_outcomes',
       corps: { outcomes: lignes },
       delai: delai('submit_outcomes'),
-      idempotence: nouvelleCleIdempotence(),
+      idempotence: cle ?? nouvelleCleIdempotence(),
       contexte: 'outcome reporting',
     },
   };
 }
 
-export function refresh(modelId: string) {
+export function refresh(modelId: string, options: RefreshOptions = {}) {
+  valider.verifierOptions('refresh', options, OPTIONS.refresh);
+  const cle = valider.cleIdempotence(options?.idempotencyKey);
   return {
     cout: 0,
     requete: {
       methode: 'POST',
-      chemin: `/v1/models/${modelId}/refresh`,
+      chemin: `/v1/models/${id(modelId)}/refresh`,
       operation: 'refresh',
       delai: delai('refresh'),
-      idempotence: nouvelleCleIdempotence(),
+      idempotence: cle ?? nouvelleCleIdempotence(),
       contexte: 'outcome integration',
     },
   };
@@ -115,13 +149,17 @@ export function performance(modelId: string, days: number) {
     cout: 0,
     requete: {
       methode: 'GET',
-      chemin: `/v1/models/${modelId}/performance`,
+      chemin: `/v1/models/${id(modelId)}/performance`,
       operation: 'performance',
       parametres: { days },
       delai: delai('performance'),
       contexte: 'observed performance',
     },
   };
+}
+
+export function verifierListe(options: unknown) {
+  valider.verifierOptions('models', options, OPTIONS.models);
 }
 
 export function listModels(limit: number, offset: number, status?: 'archived') {
@@ -139,9 +177,11 @@ export function listModels(limit: number, offset: number, status?: 'archived') {
 }
 
 /** Le rapport de validation et un essai du moteur, sans rien creer ni debiter. L'API juge. */
+// L'API lit target, task, max_samples et explain ; elle choisit le moteur seule.
 export async function evaluate(data: DataInput, options: EvaluateOptions = {} as EvaluateOptions) {
-  if ('engine' in options) throw new SpavikDataError('Use engineFamily when evaluating data.');
-  const { target, engineFamily, explain } = options;
+  valider.verifierOptions('evaluate', options, OPTIONS.evaluate);
+  const { target, task, maxSamples, explain } = options ?? {} as EvaluateOptions;
+  valider.cibleRequise('evaluate', target);
   const lignes = await normaliser(data, 'data to evaluate');
   return {
     cout: 0,
@@ -149,7 +189,7 @@ export async function evaluate(data: DataInput, options: EvaluateOptions = {} as
       methode: 'POST',
       chemin: '/v1/datasets/evaluate',
       operation: 'evaluate',
-      corps: { target, data: lignes, ...sansVides({ engine_family: engineFamily, explain }) },
+      corps: { target, data: lignes, ...sansVides({ task, max_samples: maxSamples, explain }) },
       delai: delai('train'),
       contexte: 'data evaluation',
     },
@@ -157,9 +197,12 @@ export async function evaluate(data: DataInput, options: EvaluateOptions = {} as
 }
 
 /** La serie validee et rejouee contre le naif, sans prevision ni debit. L'API juge. */
-export async function backtest(data: DataInput, {
-  target, horizon, timestamp, itemId, quantiles, pointEstimate, engineFamily, engineVersion, includeBacktestPredictions,
-}: BacktestOptions = {} as BacktestOptions) {
+export async function backtest(data: DataInput, options: BacktestOptions = {} as BacktestOptions) {
+  valider.verifierOptions('backtest', options, OPTIONS.backtest);
+  const {
+    target, horizon, timestamp, itemId, quantiles, pointEstimate, engineFamily, engineVersion, includeBacktestPredictions,
+  } = options ?? {} as BacktestOptions;
+  valider.cibleRequise('backtest', target);
   const lignes = await normaliser(data, 'series to backtest');
   // Le seul controle local : l'API prend un horizon nul pour 1 sans le dire.
   if (horizon != null && horizon < 1) {
@@ -184,7 +227,7 @@ export function archive(modelId: string) {
     cout: 0,
     requete: {
       methode: 'POST',
-      chemin: `/v1/models/${modelId}/archive`,
+      chemin: `/v1/models/${id(modelId)}/archive`,
       operation: 'archive',
       delai: 30000,
       idempotence: nouvelleCleIdempotence(),
@@ -199,7 +242,7 @@ export function restore(modelId: string) {
     cout: 0,
     requete: {
       methode: 'POST',
-      chemin: `/v1/models/${modelId}/restore`,
+      chemin: `/v1/models/${id(modelId)}/restore`,
       operation: 'restore',
       delai: 30000,
       idempotence: nouvelleCleIdempotence(),
@@ -227,7 +270,7 @@ export function getModel(modelId: string) {
     cout: 0,
     requete: {
       methode: 'GET',
-      chemin: `/v1/models/${modelId}`,
+      chemin: `/v1/models/${id(modelId)}`,
       operation: 'list_models',
       delai: delai('list_models'),
       contexte: `model ${modelId} details`,

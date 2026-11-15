@@ -4,16 +4,29 @@
 // un runtime edge. La comparaison est a temps constant : une comparaison naive
 // laisse fuir, par sa duree, le prefixe correct d'une signature forgee.
 
-import { SpavikSignatureError } from './errors.js';
+import { SpavikError, SpavikSignatureError } from './errors.js';
 
 export const TOLERANCE_SECONDS = 300;
 
-function entete(entetes: Headers | Record<string, string>, nom: string): string | null {
+/**
+ * Request headers: a Fetch `Headers` object, or a plain object such as Node's
+ * `IncomingHttpHeaders` (Express `req.headers`), whose values may be arrays.
+ */
+export type WebhookHeaders = Headers | Record<string, string | readonly string[] | undefined>;
+
+function entete(entetes: WebhookHeaders, nom: string): string | null {
   if (entetes != null && 'get' in entetes && typeof entetes.get === 'function') {
     return (entetes as Headers).get(nom);
   }
   for (const [cle, valeur] of Object.entries(entetes || {})) {
-    if (cle.toLowerCase() === nom.toLowerCase()) return valeur;
+    if (cle.toLowerCase() !== nom.toLowerCase()) continue;
+    // Node rend un tableau quand l'en-tete est repete : le premier fait foi.
+    const premiere = Array.isArray(valeur) ? valeur[0] : valeur;
+    if (premiere == null) return null;
+    if (typeof premiere !== 'string') {
+      throw new SpavikSignatureError(`unreadable ${nom} header, expected a string.`);
+    }
+    return premiere;
   }
   return null;
 }
@@ -51,7 +64,8 @@ function egalTempsConstant(a: string, b: string) {
  * The API sends `Spavik-Signature: t=<unix seconds>,v1=<hex>` and signs `<t>.` followed by the raw bytes.
  * Pass the raw request bytes; parsing and serializing the body changes its signature.
  */
-export async function verify(body: string | Uint8Array | ArrayBuffer, headers: Headers | Record<string, string>, secret: string, { tolerance = TOLERANCE_SECONDS }: { tolerance?: number } = {}): Promise<Record<string, unknown>> {
+export async function verify(body: string | Uint8Array | ArrayBuffer, headers: WebhookHeaders, secret: string, { tolerance = TOLERANCE_SECONDS }: { tolerance?: number } = {}): Promise<Record<string, unknown>> {
+  if (typeof secret !== 'string' || !secret) throw new SpavikSignatureError('missing webhook secret');
   const encodeur = new TextEncoder();
   const octets = typeof body === 'string' ? encodeur.encode(body) : new Uint8Array(body);
 
@@ -70,8 +84,12 @@ export async function verify(body: string | Uint8Array | ArrayBuffer, headers: H
   charge.set(prefixe, 0);
   charge.set(octets, prefixe.length);
 
-  // Node 18 fournit WebCrypto dans node:crypto sans toujours l'exposer globalement.
-  const subtle = globalThis.crypto?.subtle ?? (await import('node:crypto')).webcrypto.subtle;
+  // Node 22 et les runtimes edge exposent WebCrypto globalement : aucun import
+  // de node:crypto, qui casserait le bundling pour navigateur.
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new SpavikError('webhook verification needs WebCrypto (globalThis.crypto.subtle), unavailable in this runtime.');
+  }
   const cle = await subtle.importKey(
     'raw', encodeur.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );

@@ -3,7 +3,9 @@
 
 export const CLE = 'sk-spv-api-TEST-FIXTURE-not-a-real-key';
 
-export const CHURN = [
+// Douze profils repetes dix fois : 120 lignes, au-dessus du minimum de 100
+// lignes pour entrainer.
+const PROFILS = [
   { plan: 'pro', seats: 12, tickets_90d: 3, churn: 0 },
   { plan: 'free', seats: 1, tickets_90d: 9, churn: 1 },
   { plan: 'pro', seats: 40, tickets_90d: 1, churn: 0 },
@@ -17,6 +19,8 @@ export const CHURN = [
   { plan: 'team', seats: 11, tickets_90d: 2, churn: 0 },
   { plan: 'pro', seats: 30, tickets_90d: 4, churn: 0 },
 ];
+
+export const CHURN = Array.from({ length: 10 }, () => PROFILS).flat().map((l) => ({ ...l }));
 
 function json(statut, corps, entetes = {}) {
   return new Response(JSON.stringify(corps), {
@@ -156,14 +160,15 @@ export class ApiSimulee {
     }
 
     if (chemin === '/v1/models' && methode === 'GET') {
-      const limite = Number(params.get('limit') || 50);
+      // Comme l'API : une page ne depasse jamais 200 modeles.
+      const limite = Math.min(Number(params.get('limit') || 50), 200);
       const decalage = Number(params.get('offset') || 0);
       const voulu = params.get('status');
       const tous = [...this.modeles.values()]
         .filter((m) => (m.status === 'archived') === (voulu === 'archived'));
       return json(200, {
         data: tous.slice(decalage, decalage + limite),
-        pagination: { total: tous.length, limit: limite, offset: decalage },
+        pagination: { total: tous.length, limit: limite, offset: decalage, has_more: decalage + limite < tous.length },
       });
     }
 

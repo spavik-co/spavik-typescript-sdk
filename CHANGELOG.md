@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.1.0-alpha.3
+
+- Breaking: training needs at least 100 rows, as the API now requires
+  (`too_few_rows`). The local refusal reads "training needs at least 100 rows,
+  N provided. Nothing was sent." Evaluation has the same minimum on the API side.
+- Breaking: the client `timeout` option replaces the default deadline of every
+  operation. Without it, each operation keeps its own default.
+- Breaking: `evaluate()` no longer accepts `engineFamily`, which the API
+  ignores. It accepts `task` and `maxSamples`.
+- Breaking: unknown options raise `SpavikDataError` naming the option, with
+  nothing sent; `train(rows)` without `target` says the target is required.
+- Breaking: without an API key, calls raise `SpavikAuthError` locally ("no API
+  key: set SPAVIK_API_KEY or pass apiKey. Nothing was sent."), except
+  `engines()` and `engineFamilies()`. `TOKEN_INVALID` maps to `SpavikAuthError`.
+- Breaking: response bodies no longer carry `_request_id`, `_engine_version` or
+  `_predictions_remaining`. Use `requestId`, `engineVersion` and
+  `predictionsRemaining` on `Result`, and the non-enumerable `requestId` on the
+  reports of `evaluate()`, `backtest()` and `usage()`.
+- Breaking: `restore()` returns the restored `Model`. New `Model.restore()`.
+- `train`, `predict`, `forecast`, `submitOutcomes` and `refresh` accept an
+  `idempotencyKey` option, reused on every attempt, to replay a call safely.
+- `models()` follows `pagination.has_more` and caps pages at 200, so listings
+  beyond 200 models are complete.
+- `SPAVIK_BASE_URL` is read when the client is built, not at import. Reading
+  the environment no longer fails on runtimes without `process`.
+- Typed responses: `Assessment`, `EvaluationReport`, `PerformanceReport`,
+  `RefreshResult`, `OutcomesReceipt`, `Usage`, `PredictionRow` and others.
+  `Result` is generic and `get()` returns the declared field type.
+  `performance()` never returns null. `DataInput` accepts readonly arrays,
+  arrays of interface types, `Date` and `undefined` values. `verify()` accepts
+  `IncomingHttpHeaders`. Examples and type tests compile in `types:check`.
+- `verify()` no longer imports `node:crypto`, so bundling for the browser
+  works. It raises `SpavikSignatureError('missing webhook secret')` for an
+  empty secret and reads the first value of a repeated header.
+- A body JSON cannot encode (a `BigInt`, for example) raises `SpavikDataError`
+  before any attempt, instead of a transport error after retries.
+- A `Retry-After` above 60 s raises `SpavikRateLimited` at once instead of
+  blocking the call.
+- Model identifiers are URL-encoded in request paths.
+- `forecast()` checks the `itemId` column locally and compares the horizon to
+  each series, not to the total row count.
+- A training response without a model identifier raises a `SpavikError`
+  carrying the request ID and idempotency key.
+- README: Free plan of 100 predictions per calendar month, absolute links that
+  work on npm, file path rule for strings, CSV differences with the Python SDK.
+
 ## 0.1.0-alpha.2
 
 - Breaking: `train()` no longer sends `explain`. Feature importance moves to

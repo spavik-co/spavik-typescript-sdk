@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { Spavik } from '../dist/esm/index.js';
 import { ApiSimulee, CHURN, CLE, erreur } from './api-simulee.js';
-import { SpavikError } from '../dist/esm/index.js';
+import { SpavikDataError, SpavikError } from '../dist/esm/index.js';
 
 function client(api) {
   return new Spavik({ apiKey: CLE, baseUrl: 'http://api.test', fetch: api.fetch, backoff: () => 0 });
@@ -157,11 +157,12 @@ test('archiver puis restaurer, par identifiant', async () => {
 test('evaluer avant d entrainer', async () => {
   const api = new ApiSimulee();
   const spavik = client(api);
-  const rapport = await spavik.evaluate(CHURN, { target: 'churn', engineFamily: 'presage' });
+  const rapport = await spavik.evaluate(CHURN, { target: 'churn' });
   const requete = api.appels.at(-1);
   assert.equal(requete.methode, 'POST');
   assert.equal(requete.chemin, '/v1/datasets/evaluate');
-  assert.deepEqual(requete.corps, { data: CHURN, target: 'churn', engine_family: 'presage' });
+  // L'API choisit le moteur de l'essai : engine_family n'est jamais envoye.
+  assert.deepEqual(requete.corps, { data: CHURN, target: 'churn' });
   assert.equal(rapport.trial.verdict.level, 'usable');
   assert.equal(api.solde, 100);
   assert.equal(api.modeles.size, 0);
@@ -175,9 +176,12 @@ test('l importance des colonnes se demande a l evaluation, pas a l entrainement'
   const spavik = client(api);
   await spavik.evaluate(CHURN, { target: 'churn', explain: true });
   assert.equal(api.appels.at(-1).corps.explain, true);
-  await spavik.train(CHURN, { target: 'churn', explain: true });
-  const entrainement = api.appels.find((a) => a.chemin === '/v1/models' && a.methode === 'POST');
-  assert.equal('explain' in entrainement.corps, false);
+  await assert.rejects(() => spavik.train(CHURN, { target: 'churn', explain: true }), (exc) => {
+    assert.ok(exc instanceof SpavikDataError);
+    assert.match(exc.message, /^train: unknown option 'explain'\./);
+    return true;
+  });
+  assert.equal(api.compte('/v1/models'), 0);
 });
 
 test('backtester une serie', async () => {

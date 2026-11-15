@@ -1,8 +1,9 @@
-import { retryAllowed, retryDelay } from './retry.js';
+import { retryAfter, retryAllowed, retryDelay, RETRY_AFTER_MAX_MS } from './retry.js';
 import { VERSION } from './version.js';
 import type { ClientOptions } from './types.js';
-import type { Requete } from './internal.js';
+import type { Meta, Reponse, Requete } from './internal.js';
 import type { SpavikError } from './errors.js';
+import { verifierOptions } from './validate.js';
 // Transport.
 //
 // Trois choses s'y jouent, identiques a la bibliotheque Python :
@@ -12,15 +13,28 @@ import type { SpavikError } from './errors.js';
 //      telle quelle a chaque tentative. C'est elle qui evite un second debit.
 //   3. Une reponse non JSON leve une erreur nommee, pas une erreur de parsing.
 
-import { depuisReponse, reponseIllisible, SpavikTransportError } from './errors.js';
+import {
+  depuisReponse, reponseIllisible, SpavikAuthError, SpavikDataError, SpavikRateLimited, SpavikTransportError,
+} from './errors.js';
 
 export const REPRISES_MAX = 3;
 
-function env(nom: string) {
-  return globalThis.process?.env?.[nom] ?? undefined;
+// Un runtime edge n'a pas toujours `process`, et Deno refuse la lecture sans
+// permission : l'environnement est alors simplement absent.
+function env(nom: string): string | undefined {
+  try {
+    const valeur = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[nom];
+    return typeof valeur === 'string' ? valeur : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-export const BASE_URL_DEFAUT = env('SPAVIK_BASE_URL') || 'https://api.spavik.co';
+export const BASE_URL_DEFAUT = 'https://api.spavik.co';
+
+export const SANS_CLE = 'no API key: set SPAVIK_API_KEY or pass apiKey. Nothing was sent.';
+
+const OPTIONS_CLIENT = ['apiKey', 'baseUrl', 'userAgent', 'timeout', 'fetch', 'maxRetries', 'backoff'] as const;
 
 export function nouvelleCleIdempotence() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().replace(/-/g, '');
@@ -70,6 +84,14 @@ function soldeEntete(entetes: Headers) {
   return Number.isInteger(n) ? n : null;
 }
 
+function meta(entetes: Headers): Meta {
+  return {
+    requestId: requestId(entetes),
+    engineVersion: entetes.get('x-spavik-model-version') || null,
+    predictionsRemaining: soldeEntete(entetes),
+  };
+}
+
 export function interpreter(statut: number, entetes: Headers, texte: string, requete: Requete): { corps: unknown; erreur: SpavikError | null } {
   const rid = requestId(entetes);
   const contentType = (entetes.get('content-type') || '').toLowerCase();
@@ -94,15 +116,38 @@ export function interpreter(statut: number, entetes: Headers, texte: string, req
   if (statut >= 400) {
     return { corps: null, erreur: depuisReponse(statut, corps, rid, requete.contexte) };
   }
-
-  if (corps && typeof corps === 'object' && !Array.isArray(corps)) {
-    const objet = corps as Record<string, unknown>;
-    objet._request_id = rid;
-    if (entetes.has('x-spavik-model-version')) objet._engine_version = entetes.get('x-spavik-model-version');
-    const solde = soldeEntete(entetes);
-    if (solde !== null && objet._predictions_remaining === undefined) objet._predictions_remaining = solde;
-  }
+  // Le corps reste celui de l'API : les en-tetes passent par `meta`, jamais
+  // par des cles ajoutees au corps.
   return { corps, erreur: null };
+}
+
+// Serialise une fois, avant toute tentative : une valeur que JSON ne sait pas
+// ecrire (BigInt, reference circulaire) est une erreur de donnees, pas une panne.
+function serialiser(requete: Requete): string | undefined {
+  if (requete.corps == null) return undefined;
+  try {
+    return JSON.stringify(requete.corps);
+  } catch (exc) {
+    const raison = exc instanceof Error ? exc.message : String(exc);
+    throw new SpavikDataError(
+      `${requete.contexte || requete.operation}: the data cannot be converted to JSON (${raison}). Nothing was sent.`,
+    );
+  }
+}
+
+// L'API demande plus d'attente que le SDK n'en accorde : rendre la main tout de
+// suite, avec le delai demande, plutot que bloquer l'appelant.
+function attenteTropLongue(erreur: SpavikError, demande: number, requete: Requete) {
+  const secondes = Math.ceil(demande / 1000);
+  const limite = RETRY_AFTER_MAX_MS / 1000;
+  const refus = new SpavikRateLimited(
+    `${requete.contexte || requete.operation}: the API asks to wait ${secondes} s before retrying, `
+    + `beyond the ${limite} s the SDK waits. Retry later.`,
+    { code: erreur.code, detail: erreur.detail, status: erreur.status, requestId: erreur.requestId, payload: erreur.payload },
+  );
+  refus.idempotencyKey = erreur.idempotencyKey;
+  refus.cause = erreur;
+  return refus;
 }
 
 /** Shared client configuration and HTTP transport. */
@@ -111,7 +156,7 @@ export class Transport {
   declare readonly cleApi: string;
   declare readonly baseUrl: string;
   /** @internal */
-  declare readonly timeout: number;
+  declare readonly timeout: number | null;
   /** @internal */
   declare readonly userAgent: string;
   /** @internal */
@@ -120,14 +165,21 @@ export class Transport {
   declare readonly backoff: (tentative: number) => number;
   /** @internal */
   declare readonly fetch: typeof globalThis.fetch;
-  constructor({
-    apiKey, baseUrl, userAgent, timeout = 30000, fetch: fetchImpl,
-    maxRetries = REPRISES_MAX, backoff = attente,
-  }: ClientOptions = {}) {
+  constructor(options: ClientOptions = {}) {
+    verifierOptions('Spavik', options, OPTIONS_CLIENT);
+    const {
+      apiKey, baseUrl, userAgent, timeout, fetch: fetchImpl,
+      maxRetries = REPRISES_MAX, backoff = attente,
+    } = options;
+    if (timeout != null && !(typeof timeout === 'number' && timeout > 0 && Number.isFinite(timeout))) {
+      throw new SpavikDataError(`the timeout must be a positive number of milliseconds, got ${String(timeout)}.`);
+    }
     // Une chaine vide ne doit pas reprendre une cle de l'environnement.
     this.cleApi = apiKey ?? env('SPAVIK_API_KEY') ?? '';
-    this.baseUrl = (baseUrl || BASE_URL_DEFAUT).replace(/\/+$/, '');
-    this.timeout = timeout;
+    // Lue ici, pas a l'import : un .env charge apres l'import doit compter.
+    this.baseUrl = (baseUrl || env('SPAVIK_BASE_URL') || BASE_URL_DEFAUT).replace(/\/+$/, '');
+    // Fournie, elle prime sur les delais par operation ; absente, chacune garde le sien.
+    this.timeout = timeout ?? null;
     this.userAgent = userAgent || `spavik-javascript/${VERSION}`;
     // Politique de reprise, remplacable : certains appelants veulent
     // n'en faire aucune, d'autres attendre autrement.
@@ -167,12 +219,20 @@ export class Transport {
 
   /** @internal */
   async envoyer<T = Record<string, unknown>>(requete: Requete): Promise<T> {
+    return (await this.envoyerAvecMeta<T>(requete)).corps;
+  }
+
+  /** @internal */
+  async envoyerAvecMeta<T = Record<string, unknown>>(requete: Requete): Promise<Reponse<T>> {
+    if (!this.cleApi && !requete.publique) throw new SpavikAuthError(SANS_CLE);
+    const corpsHttp = serialiser(requete);
+    const delai = this.timeout ?? requete.delai ?? 30000;
     let tentative = 0;
     for (;;) {
       tentative += 1;
       const debut = Date.now();
       const controleur = new AbortController();
-      const minuterie = setTimeout(() => controleur.abort(), requete.delai ?? this.timeout);
+      const minuterie = setTimeout(() => controleur.abort(), delai);
       let reponse: Response | undefined;
       let texte: string;
       try {
@@ -180,7 +240,7 @@ export class Transport {
           reponse = await this.fetch(this.url(requete.chemin, requete.parametres), {
             method: requete.methode,
             headers: this.entetes(requete),
-            body: requete.corps == null ? undefined : JSON.stringify(requete.corps),
+            body: corpsHttp,
             signal: controleur.signal,
           });
           texte = await reponse.text();
@@ -195,7 +255,9 @@ export class Transport {
         // Un corps interrompu apres un 2xx reste une panne reseau. Conserver
         // les refus HTTP deja connus, notamment 401/403, sans les rejouer.
         const statutReprise = statut !== null && statut >= 400 ? statut : null;
-        if (tentative < this.maxRetries && retryAllowed(statutReprise, null, requete)) {
+        const demande = retryAfter(reponse?.headers.get('Retry-After') ?? null);
+        if (tentative < this.maxRetries && retryAllowed(statutReprise, null, requete)
+          && (demande === null || demande <= RETRY_AFTER_MAX_MS)) {
           await dormir(retryDelay(reponse?.headers.get('Retry-After') ?? null, null, this.backoff(tentative)));
           continue;
         }
@@ -210,11 +272,13 @@ export class Transport {
       }
 
       const { corps, erreur } = interpreter(reponse.status, reponse.headers, texte, requete);
-      tracer(requete, reponse.status, Date.now() - debut,
-        (corps as Record<string, unknown> | null)?._request_id ?? erreur?.requestId, this.cleApi, tentative);
-      if (!erreur) return corps as T;
+      const infos = meta(reponse.headers);
+      tracer(requete, reponse.status, Date.now() - debut, infos.requestId ?? erreur?.requestId, this.cleApi, tentative);
+      if (!erreur) return { corps: corps as T, meta: infos };
       erreur.idempotencyKey = requete.idempotence ?? null;
       if (tentative < this.maxRetries && retryAllowed(reponse.status, erreur.code, requete)) {
+        const demande = retryAfter(reponse.headers.get('Retry-After'));
+        if (demande !== null && demande > RETRY_AFTER_MAX_MS) throw attenteTropLongue(erreur, demande, requete);
         await dormir(retryDelay(reponse.headers.get('Retry-After'), erreur.code, this.backoff(tentative)));
         continue;
       }

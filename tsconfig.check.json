@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": ".",
+    "allowJs": true,
+    "checkJs": true,
+    "paths": {
+      "spavik": ["./src/index.ts"],
+      "spavik/webhooks": ["./src/webhooks.ts"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/types/*.ts",
+    "examples/*.mjs"
+  ]
+}
