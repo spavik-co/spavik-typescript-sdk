@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-alpha.3
+## 0.1.0
 
 - Breaking: training needs at least 100 rows, as the API now requires
   (`too_few_rows`). The local refusal reads "training needs at least 100 rows,
