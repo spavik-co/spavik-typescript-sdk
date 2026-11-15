@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Documentation only: a new README, shown on npm and GitHub, that explains
+  what Spavik predicts before the reference details, with links to the use
+  case guides. package.json gains a fuller description and keywords. No code
+  change. 0.1.0 was tagged but never published on npm: 0.1.1 is the first
+  release after 0.1.0-alpha.2 there, and includes every 0.1.0 change below.
+
 ## 0.1.0
 
 - Breaking: training needs at least 100 rows, as the API now requires
