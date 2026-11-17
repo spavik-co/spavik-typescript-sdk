@@ -1,6 +1,6 @@
 {
   "name": "spavik",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Prediction API for TypeScript and JavaScript apps: create a model from your data in one call, then predict churn, conversions, prices, delivery times or demand. No ML stack to build.",
   "keywords": [
     "spavik",
