@@ -63,7 +63,7 @@ export interface ClientOptions {
   apiKey?: string;
   /** Application User-Agent, e.g. "my-agent/1.0". Defaults to the SDK name/version. */
   userAgent?: string;
-  /** Defaults to `SPAVIK_BASE_URL` or `https://api.spavik.co`. */
+  /** Defaults to `https://api.spavik.co`. */
   baseUrl?: string;
   /**
    * Timeout per attempt in milliseconds, including the response body. When set,
